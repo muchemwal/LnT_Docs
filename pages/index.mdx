@@ -1,0 +1,53 @@
+# LANDTTS Digital Patient Transport Platform
+
+import { Callout, Cards, Card } from 'nextra/components'
+
+<Callout type="info">
+  Version 2.0 — Technical and Operational Documentation
+</Callout>
+
+The LANDTTS platform is a purpose-built clinical transport management system for NHS-contracted
+patient transfer services. It replaces paper-based Patient Transfer Forms (PTFs), manual dispatch,
+and fragmented admin processes with a unified digital workflow from booking to financial reconciliation.
+
+## Core Capabilities
+
+<Cards>
+  <Card title="Booking Management" href="/booking-lifecycle">
+    7-step PTF wizard with clinical risk assessment, mileage calculation, and return leg handling
+  </Card>
+  <Card title="Dispatch Operations" href="/dispatch-operations">
+    Real-time dispatch board with crew assignment, compliance checks, and WebSocket live updates
+  </Card>
+  <Card title="Mobile Crew Workflow" href="/mobile-crew">
+    Job acceptance, GPS-tracked journey, arrival logging, and clinical handover
+  </Card>
+  <Card title="Factorial HR Integration" href="/factorial-integration">
+    Shift sync, absence tracking, clock in/out, timesheet approvals via Factorial 2026-01-01 API
+  </Card>
+  <Card title="Billing & Accounting" href="/billing-accounting">
+    Rate card invoicing, PDF generation, Xero synchronisation
+  </Card>
+  <Card title="NHS Compliance" href="/nhs-compliance">
+    DSPT alignment, UK GDPR, AES-256 PHI encryption, 8-year retention
+  </Card>
+</Cards>
+
+## Architecture at a Glance
+
+| Layer | Technology |
+|---|---|
+| Web App | React (Vite) |
+| Mobile App | React Native (Expo SDK 50) |
+| API Gateway | Port 8000, routes to 19 microservices |
+| Services | Express.js, ports 3001–3018 |
+| Database | PostgreSQL 15+ with Prisma ORM |
+| Cache / PubSub | Redis 7+ |
+| Identity | Keycloak OIDC with TOTP MFA |
+| Storage | Amazon S3 (signatures, PDFs, documents) |
+| Integrations | Xero (accounting), Factorial HR (payroll), Mapbox (geocoding) |
+
+## Screenshot Reference
+
+
+![Dashboard Overview](/images/04-dashboard-overview.png)

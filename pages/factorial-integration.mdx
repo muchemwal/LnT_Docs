@@ -1,0 +1,295 @@
+# Factorial HR Integration
+
+import { Callout, Tabs, Tab, Steps } from 'nextra/components'
+
+The platform integrates with [Factorial HR](https://apidoc.factorialhr.com/reference) via the
+**2026-01-01 API version** for employee management, attendance tracking, shift synchronisation,
+absence management, and timesheet approvals.
+
+<Callout type="info">
+  Service: `hr-integration` (port 3017). Connector: `FactorialConnector` implementing `HRPort` interface.
+</Callout>
+
+## API Base URL
+
+```
+https://api.factorialhr.com/api/2026-01-01
+```
+
+## Authentication
+
+Factorial uses **OAuth 2.0** with access/refresh tokens.
+
+<Steps>
+
+### Create OAuth Application
+
+Navigate to `https://api.demo.factorial.dev/oauth/applications` and create credentials.
+
+### Authorise
+
+```
+https://api.demo.factorial.dev/oauth/authorize?client_id=CLIENT_ID&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code
+```
+
+### Exchange for Token
+
+```bash
+curl -X POST 'https://api.factorialhr.com/oauth/token' \
+  -d 'client_id=<CLIENT_ID>&client_secret=<CLIENT_SECRET>&code=<AUTH_CODE>&grant_type=authorization_code&redirect_uri=<REDIRECT_URI>'
+```
+
+Response:
+```json
+{
+  "access_token": "de6780bc506a...",
+  "token_type": "Bearer",
+  "expires_in": 7200,
+  "refresh_token": "8257e65c9720...",
+  "scope": "read write",
+  "created_at": 1680013957
+}
+```
+
+### Refresh Token
+
+```bash
+curl -X POST 'https://api.factorialhr.com/oauth/token' \
+  -d 'client_id=<CLIENT_ID>&client_secret=<CLIENT_SECRET>&refresh_token=<REFRESH_TOKEN>&grant_type=refresh_token'
+```
+
+</Steps>
+
+## Attendance Shifts API
+
+The core integration point for crew timesheets. Maps directly to the mobile app's shift check-in/out.
+
+### Read All Shifts
+
+```
+GET /api/2026-01-01/resources/attendance/shifts
+```
+
+Query parameters:
+| Parameter | Type | Description |
+|---|---|---|
+| `employee_ids[]` | `integer[]` | Filter by employee IDs |
+| `start_on` | `string` | Shifts starting after this date |
+| `end_on` | `string` | Shifts ending before this date |
+| `half_day` | `boolean` | Filter half-day shifts |
+| `workable` | `boolean` | Filter workable day shifts |
+| `latest_shift` | `boolean` | Only latest shift per employee |
+
+Response shape:
+```json
+{
+  "data": [
+    {
+      "id": 123,
+      "employee_id": 456,
+      "date": "2026-03-17",
+      "reference_date": "2026-03-17",
+      "clock_in": "08:00",
+      "clock_out": "17:00",
+      "observations": "Patient transfer shift",
+      "location_type": "business_trip",
+      "minutes": 540,
+      "workable": true,
+      "company_id": 1
+    }
+  ],
+  "meta": {
+    "has_next_page": false,
+    "total": 1
+  }
+}
+```
+
+### Create a Shift (Push Timesheet)
+
+```
+POST /api/2026-01-01/resources/attendance/shifts
+```
+
+### Clock In / Clock Out
+
+```
+POST /api/2026-01-01/resources/attendance/shifts/clock_in
+POST /api/2026-01-01/resources/attendance/shifts/clock_out
+```
+
+### Break Management
+
+```
+POST /api/2026-01-01/resources/attendance/shifts/break_start
+POST /api/2026-01-01/resources/attendance/shifts/break_end
+```
+
+## Platform ↔ Factorial Data Flow
+
+```
+┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────────┐
+│   Mobile App         │     │   LANDTTS Platform    │     │   Factorial HR       │
+│   (Crew Member)      │     │   (hr-integration)    │     │   (2026-01-01 API)   │
+├─────────────────────┤     ├──────────────────────┤     ├─────────────────────┤
+│                     │     │                      │     │                     │
+│ Shift Check-In ─────┼────▶│ POST /v1/hr/         │────▶│ POST /attendance/   │
+│ (GPS + timestamp)   │     │   sync/shifts        │     │   shifts/clock_in   │
+│                     │     │                      │     │                     │
+│ Break Start ────────┼────▶│ (break tracking)     │────▶│ POST /attendance/   │
+│                     │     │                      │     │   shifts/break_start│
+│                     │     │                      │     │                     │
+│ Break End ──────────┼────▶│ (break tracking)     │────▶│ POST /attendance/   │
+│                     │     │                      │     │   shifts/break_end  │
+│                     │     │                      │     │                     │
+│ Shift Check-Out ────┼────▶│ POST /v1/hr/         │────▶│ POST /attendance/   │
+│ (GPS + timestamp)   │     │   sync/shifts        │     │   shifts/clock_out  │
+│                     │     │                      │     │                     │
+│ Job Completed ──────┼────▶│ (auto-timesheet)     │────▶│ POST /attendance/   │
+│ (PTF closed)        │     │                      │     │   shifts            │
+│                     │     │                      │     │                     │
+│ Absence Request ────┼────▶│ POST /v1/hr/         │────▶│ POST /timeoff/      │
+│                     │     │   sync/absence       │     │   leaves            │
+│                     │     │                      │     │                     │
+│ HR Approval ────────┼────▶│ (timesheet approve)  │────▶│ POST /attendance/   │
+│ (web dashboard)     │     │                      │     │   reviews/bulk_create│
+└─────────────────────┘     └──────────────────────┘     └─────────────────────┘
+```
+
+## Internal API Endpoints
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/v1/hr/sync/employee` | Sync employee record to Factorial |
+| `POST` | `/v1/hr/sync/shifts` | Sync shift data (clock in/out) |
+| `POST` | `/v1/hr/sync/absence` | Sync absence records |
+| `POST` | `/v1/hr/export/worked-hours` | Export worked hours for pay period |
+| `POST` | `/v1/hr/sync/clock-in` | Real-time clock-in via Factorial |
+| `POST` | `/v1/hr/sync/clock-out` | Real-time clock-out via Factorial |
+| `POST` | `/v1/hr/sync/break-start` | Sync break start |
+| `POST` | `/v1/hr/sync/break-end` | Sync break end |
+| `GET` | `/v1/hr/shifts` | Read shifts from Factorial |
+| `GET` | `/v1/integration/health` | Integration health status |
+
+## Mobile App Actions → Factorial Mapping
+
+| Mobile Action | Platform Event | Factorial API Call |
+|---|---|---|
+| Crew taps "Check In" | Shift record created | `POST /attendance/shifts/clock_in` |
+| Crew taps "Start Break" | Break start logged | `POST /attendance/shifts/break_start` |
+| Crew taps "End Break" | Break end logged | `POST /attendance/shifts/break_end` |
+| Crew taps "Check Out" | Shift completed | `POST /attendance/shifts/clock_out` |
+| PTF reaches `closed` | Auto-timesheet generated | `POST /attendance/shifts` (full shift record) |
+| HR approves timesheet | Timesheet approved | `POST /attendance/reviews/bulk_create` |
+| Crew requests absence | Absence record created | `POST /timeoff/leaves` |
+| HR approves absence | Leave approved | `POST /timeoff/leaves/approve` |
+
+## Connector Implementation
+
+<Tabs items={['Push Shift', 'Clock In', 'Read Shifts']}>
+  <Tab>
+```typescript
+// POST /api/2026-01-01/resources/attendance/shifts
+async syncShifts(shifts: HRShift[]): Promise<SyncResult> {
+  return withRetry(async () => {
+    for (const shift of shifts) {
+      await axios.post(
+        `${FACTORIAL_API_BASE}/resources/attendance/shifts`,
+        {
+          employee_id: shift.factorial_employee_id,
+          clock_in: shift.start_at,
+          clock_out: shift.end_at,
+          reference_date: shift.reference_date,
+          observations: shift.role ?? '',
+        },
+        { headers: this.headers },
+      );
+    }
+    return { success: true, syncedAt: new Date().toISOString() };
+  });
+}
+```
+  </Tab>
+  <Tab>
+```typescript
+// POST /api/2026-01-01/resources/attendance/shifts/clock_in
+async clockIn(employeeId: number, now: string): Promise<SyncResult> {
+  return withRetry(async () => {
+    await axios.post(
+      `${FACTORIAL_API_BASE}/resources/attendance/shifts/clock_in`,
+      { employee_id: employeeId, now },
+      { headers: this.headers },
+    );
+    return { success: true, syncedAt: new Date().toISOString() };
+  });
+}
+```
+  </Tab>
+  <Tab>
+```typescript
+// GET /api/2026-01-01/resources/attendance/shifts
+async getShifts(params: {
+  employee_ids?: number[];
+  start_on?: string;
+  end_on?: string;
+}): Promise<FactorialShift[]> {
+  const response = await axios.get(
+    `${FACTORIAL_API_BASE}/resources/attendance/shifts`,
+    { headers: this.headers, params },
+  );
+  return response.data.data;
+}
+```
+  </Tab>
+</Tabs>
+
+## Timeoff / Absence Integration
+
+| Factorial Endpoint | Purpose |
+|---|---|
+| `GET /timeoff/leaves` | Read all leave requests |
+| `POST /timeoff/leaves` | Create a leave request |
+| `POST /timeoff/leaves/approve` | Approve a leave |
+| `POST /timeoff/leaves/reject` | Reject a leave |
+| `GET /timeoff/leave-types` | Available leave types |
+| `GET /timeoff/allowance-stats` | Remaining allowance per employee |
+
+## Webhook Support
+
+Factorial supports webhooks for real-time event notifications. Relevant events:
+
+| Webhook | Use Case |
+|---|---|
+| `Attendance > Shift > Clock ins` | Confirm clock-in synced |
+| `Attendance > Shift > Clock outs` | Confirm clock-out synced |
+| `Attendance > Shift > Creates` | New shift created externally |
+| `Attendance > Shift > Updates` | Shift modified in Factorial |
+| `Timeoff > Leave > Approves` | Leave approved in Factorial → update platform |
+| `Timeoff > Leave > Rejects` | Leave rejected → notify crew |
+| `Employees > Employee > Updates` | Employee data changed → sync back |
+
+Configure via `POST /api/2026-01-01/resources/api-public/webhook-subscriptions`.
+
+## Integration Health
+
+`GET /v1/integration/health` returns:
+```json
+{
+  "status": "healthy",
+  "provider": "factorial",
+  "lastSyncAt": "2026-03-17T14:30:00Z",
+  "failedRecords": 0,
+  "apiVersion": "2026-01-01"
+}
+```
+
+![Factorial HR Sync](/images/54-factorial-hr-sync.png)
+
+## Environment Variables
+
+| Variable | Description |
+|---|---|
+| `FACTORIAL_API_KEY` | OAuth Bearer token for Factorial API |
+| `FACTORIAL_CLIENT_ID` | OAuth application ID |
+| `FACTORIAL_CLIENT_SECRET` | OAuth application secret |
+| `FACTORIAL_WEBHOOK_SECRET` | Webhook signature verification secret |

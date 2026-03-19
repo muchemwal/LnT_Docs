@@ -1,0 +1,111 @@
+# Booking Lifecycle (PTF)
+
+import { Callout, Steps, Tabs, Tab } from 'nextra/components'
+
+Bookings are created through a **7-step Patient Transfer Form (PTF) wizard**. The form creates both
+a `TransferJob` record and an associated `PTF` record.
+
+## PTF Multi-Step Form
+
+![PTF List Page](/images/06-ptf-list-page.png)
+
+<Steps>
+
+### Step 1 — Referral
+
+Referral source, client/funding authority dropdown, booking date (defaults to today).
+
+- Internal users select from a client dropdown which auto-fills the funding authority
+- External users have referral source locked to "External Client" with funding authority prepopulated
+
+![Step 1 Referral](/images/08-step1-referral.png)
+
+### Step 2 — Patient
+
+Patient name, DOB (calendar picker), NHS number with auto-lookup, gender, ethnicity, blood type,
+allergies, medications, GP details, next of kin.
+
+<Callout type="info">
+  When a previously used NHS number is entered, the system auto-populates name, DOB, blood type,
+  GP details, and next of kin from the most recent record.
+</Callout>
+
+![Step 2 Patient](/images/10-step2-patient-empty.png)
+![NHS Lookup](/images/11-step2-nhs-lookup.png)
+
+### Step 3 — Transfer
+
+Pickup and destination addresses with postcodes. Mileage is auto-calculated via geocoding.
+
+- Return leg checkbox reverses addresses and doubles mileage
+- Transfer datetime, priority (routine/urgent/emergency), mode of arrival
+
+![Mileage Calculated](/images/15-step3-mileage-calculated.png)
+![Return Leg](/images/16-step3-return-leg.png)
+
+### Step 4 — Clinical
+
+Clinical notes (encrypted), mobility requirements, equipment, infection control, oxygen, MHA section.
+
+All clinical notes are stored with **AES-256 encryption** at rest.
+
+![Clinical Step](/images/18-step4-clinical.png)
+
+### Step 5 — Risk Assessment
+
+Risk checklist with toggle switches: violence, self-harm, absconding, substance misuse.
+Each risk can have accompanying notes.
+
+![Risk Assessment](/images/19-step5-risk-checklist.png)
+
+### Step 6 — Crew & Escort
+
+- Internal users: crew dropdown, vehicle dropdown, escort options
+- External users: free-form crew name textarea
+
+![Crew Internal](/images/20-step6-crew-internal.png)
+
+### Step 7 — Review & Submit
+
+Full booking summary. Submit creates the PTF in `draft` status.
+
+![Review](/images/22-step7-review.png)
+
+</Steps>
+
+## Status Transitions
+
+```
+draft → booking → crew_assigned → enroute_pickup → arrived_pickup
+→ departed_pickup → enroute_destination → arrived_destination
+→ handover_completed → compliance_pending → closed
+```
+
+Each transition:
+- Validates against `VALID_TRANSITIONS` (forward-only)
+- Sets a corresponding timestamp (e.g. `crew_assigned_at`, `pickup_arrival_at`)
+- Creates a `WorkflowEvent` audit record
+- Triggers push notifications (job reference only, never patient data)
+
+## Return Journey Logic
+
+| Scenario | Behaviour |
+|---|---|
+| Return leg disabled | Single outbound job + PTF |
+| Return leg enabled | Two jobs created: A→B and B→A, each with own PTF |
+| Mileage | Doubled when return leg is enabled |
+| Dispatch | Both jobs appear independently on the dispatch board |
+| Billing | Each job generates a separate invoice |
+
+## PHI Encryption
+
+All Patient Health Information is encrypted with AES-256 before database write via `encryptPhiFields()`:
+
+```
+patient_name, patient_dob, patient_nhs_number, patient_blood_type,
+patient_allergies, patient_medications, patient_diagnosis,
+gp_name, gp_surgery, next_of_kin_name, next_of_kin_phone,
+clinical_notes, handover_notes, transfer_origin, transfer_destination
+```
+
+Decryption happens only at the API response layer via `decryptPtfRecord()`.

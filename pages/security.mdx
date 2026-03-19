@@ -1,0 +1,43 @@
+# Security Architecture
+
+import { Callout } from 'nextra/components'
+
+## Encryption Standards
+
+| Layer | Implementation |
+|---|---|
+| PHI at rest | AES-256 via `CryptoService`. Stored as `Bytes` in PostgreSQL. |
+| Messages | End-to-end encryption. Server never holds plaintext. |
+| Data in transit | TLS 1.2+ for all API communication. |
+| Incident data | Location, description, persons_involved encrypted. |
+
+## Authentication Flow
+
+1. User submits credentials to `POST /v1/auth/login`
+2. Auth service exchanges with Keycloak token endpoint
+3. If MFA required → Keycloak returns `CONFIGURE_TOTP`
+4. JWT access + refresh tokens issued
+5. Middleware validates on every request
+6. Failed logins tracked → account locks after threshold
+
+![Keycloak Login](/images/01-keycloak-login.png)
+![MFA Setup](/images/02-mfa-totp-setup.png)
+
+## RBAC Enforcement
+
+Two levels:
+1. **API Middleware** — `requireRole()` validates JWT role claim. Unauthorised → HTTP 403.
+2. **Data Scoping** — Crew sees only own jobs. Clients see only own org bookings.
+
+## Session Management
+
+- Access tokens: short expiry (~15 min)
+- Refresh: `POST /v1/auth/refresh`
+- Logout: `POST /v1/auth/logout` → Keycloak session invalidation
+
+## Threat Protection
+
+- Account lockout after configurable failed attempts
+- File upload limits: signatures 10 MB, documents 25 MB, attachments 20 MB
+- Pagination max 100 records
+- PHI detection in messaging service

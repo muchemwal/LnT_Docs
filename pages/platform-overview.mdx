@@ -1,0 +1,75 @@
+# Platform Overview
+
+import { Callout } from 'nextra/components'
+
+## System Description
+
+LANDTTS is a microservices-based platform comprising **19 independently deployable services**, a React
+web application for dispatchers and administrators, and a React Native (Expo) mobile application for
+crew members. All services communicate through a central API gateway and share a PostgreSQL database
+via Prisma ORM.
+
+The platform supports five user roles: `administrator`, `dispatcher`, `crew_member`, `hr_manager`,
+and `client`. Each role has precisely scoped permissions enforced at the API middleware layer through
+Keycloak-issued JWT tokens.
+
+![App Shell Navigation](/images/05-app-shell-navigation.png)
+
+## User Roles
+
+| Role | Description |
+|---|---|
+| `administrator` | Full platform access. Manages users, settings, billing, compliance. |
+| `dispatcher` | Creates bookings, assigns crew/vehicles, monitors dispatch board. |
+| `crew_member` | Mobile-focused. Accepts jobs, records journey events, captures signatures. |
+| `hr_manager` | Manages employees, certifications, shifts, timesheets, absences. |
+| `client` | External portal. Views booking history, submits requests, duplicates bookings. |
+
+## Microservices Map
+
+| Service | Port | Responsibility |
+|---|---|---|
+| auth-service | 3001 | Authentication, MFA, user management |
+| job-service | 3002 | Transfer job CRUD, crew assignment, dispatch WebSocket |
+| ptf-service | 3003 | PTF CRUD, workflow state machine, signatures, risks |
+| gps-service | 3004 | GPS location ingestion (WebSocket), history queries |
+| messaging-service | 3005 | Encrypted conversations, PHI detection |
+| rota-service | 3006 | Shift management, WTR checks, timesheets |
+| employee-service | 3007 | Employee records, certifications, DBS tracking |
+| client-service | 3008 | Client organisations, booking history, duplicates |
+| incident-service | 3009 | Incident reporting, investigation tracking |
+| vehicle-service | 3010 | Fleet management, inspections, compliance |
+| notification-service | 3011 | Multi-channel notifications, SSE streaming |
+| billing-service | 3012 | Invoice lifecycle, rate cards, PDF generation |
+| consent-service | 3013 | Consent capture, DSAR search |
+| reporting-service | 3014 | Analytics, HR reports, DPO reports |
+| audit-service | 3015 | Immutable audit event storage (INSERT-only) |
+| compliance-service | 3016 | DSAR, right-to-erasure, retention enforcement |
+| hr-integration | 3017 | Factorial HR sync (employees, shifts, absences) |
+| accounting-integration | 3018 | Xero sync (invoices, contacts, payments) |
+
+## High-Level Architecture
+
+```
+Presentation ─── React Web (Vite) + React Native Mobile (Expo SDK 50)
+       │
+  API Gateway ─── Port 8000, routes by URL prefix
+       │
+  Service Layer ── 19 microservices (ports 3001–3018)
+       │
+  Data Layer ───── PostgreSQL (Prisma) + Redis (cache/pub-sub) + S3 (binary)
+       │
+  Identity ─────── Keycloak OIDC with TOTP MFA
+       │
+  Integrations ─── Xero │ Factorial HR │ Mapbox
+```
+
+## Operational Workflows
+
+- Routine patient transfers (scheduled, non-emergency)
+- Urgent and emergency transfers with priority escalation
+- Mental Health Act section transfers with legal documentation
+- Multi-leg journeys with accommodation, meals, and expense tracking
+- Return leg transfers within the same booking
+- Client-initiated booking requests through the portal
+- External referral intake with prepopulated referral source

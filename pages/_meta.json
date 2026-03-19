@@ -1,0 +1,15 @@
+{
+  "index": "Introduction",
+  "platform-overview": "Platform Overview",
+  "booking-lifecycle": "Booking Lifecycle (PTF)",
+  "dispatch-operations": "Dispatch & Operations",
+  "mobile-crew": "Mobile Crew Workflow",
+  "clinical-handover": "Clinical Handover & Signatures",
+  "compliance-closure": "Compliance Closure",
+  "factorial-integration": "Factorial HR Integration",
+  "billing-accounting": "Billing & Accounting",
+  "security": "Security Architecture",
+  "nhs-compliance": "NHS Compliance & GDPR",
+  "api-reference": "API Reference",
+  "deployment": "Deployment Guide"
+}

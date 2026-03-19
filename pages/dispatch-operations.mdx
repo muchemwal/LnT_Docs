@@ -1,0 +1,51 @@
+# Dispatch & Operations
+
+import { Callout } from 'nextra/components'
+
+## Dispatch Board
+
+The dispatch board provides a real-time pipeline view with columns: **pending → accepted → en_route
+→ on_scene → patient_loaded → completed**. Updates arrive via WebSocket within seconds of crew actions.
+
+![Dispatch Board](/images/25-dispatch-board-pipeline.png)
+
+## Crew Assignment
+
+Assignment is performed through a modal with:
+- Crew member dropdown (filtered to active, compliant crew)
+- Vehicle dropdown (filtered to compliant vehicles)
+- Compliance check indicators (DBS status, certifications, MOT/insurance)
+
+![Crew Assignment](/images/27-crew-assignment-modal.png)
+
+<Callout type="warning">
+  If crew DBS or vehicle MOT/insurance is expired, the assignment is rejected with a
+  `COMPLIANCE_VIOLATION` error.
+</Callout>
+
+On successful assignment, the crew receives a push notification within 5 seconds. An unaccepted job
+triggers a dispatcher alert after 10 minutes via Redis tracking.
+
+## Real-Time Monitoring
+
+- Live GPS map with crew positions (10-second updates)
+- Status timeline with all transitions and timestamps
+- Journey log entries from crew (clinical events, delays, restraint)
+- WebSocket-driven dispatch board updates
+
+![Live Tracking](/images/29-live-tracking-map.png)
+
+## Notifications
+
+| Channel | Mechanism | PHI Policy |
+|---|---|---|
+| Push | Mobile device delivery | Job reference only, never patient data |
+| In-app | SSE stream at `GET /v1/notifications/stream` | Scoped to user role |
+| Categories | `job_alert`, `rota_change`, `cert_expiry`, `system_alert`, `message`, `incident_alert`, `billing` | — |
+
+Key automated notifications:
+- Crew assigned → crew notified
+- Crew en route / arrived / departed → dispatcher notified
+- Handover completed → both parties notified
+- Unaccepted job after 10 min → dispatcher alerted
+- Certification expiring → employee + HR notified

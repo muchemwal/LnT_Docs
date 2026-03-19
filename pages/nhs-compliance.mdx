@@ -1,0 +1,42 @@
+# NHS Compliance & GDPR
+
+import { Callout } from 'nextra/components'
+
+## DSPT Alignment
+
+| Standard | Implementation |
+|---|---|
+| 1 — Personal data safeguards | AES-256 encryption, RBAC |
+| 2 — Staff responsibilities | Role-based training via certifications |
+| 3 — Need-to-know access | RBAC with data scoping per role |
+| 7 — Lawful data sharing | Consent records with lawful basis |
+| 8 — Breach response | Incident reporting, breach detection |
+| 9 — Cyber threat protection | MFA, account lockout, encrypted storage |
+| 10 — Supplier accountability | Data processor registry |
+
+## UK GDPR
+
+- **Lawful basis**: consent, vital_interests, legitimate_task
+- **DSAR**: `POST /v1/admin/dsar` by NHS number
+- **Right to erasure**: `POST /v1/admin/erasure` (blocked within 8-year retention)
+- **Consent withdrawal**: `PATCH /v1/consents/:id/withdraw`
+- **Data minimisation**: push notifications contain only job references
+
+## Data Retention
+
+- Clinical records (PTFs): minimum **8-year** retention
+- Soft delete via `deleted_at` — hard delete blocked until retention expires
+- `retention-enforcer` module enforces policies
+- Audit records retained indefinitely (immutable)
+
+## DPO Reporting
+
+`GET /v1/reports/dpo` generates monthly reports:
+- PHI volume, DSAR count, breach events, consent statistics
+
+![DPO Report](/images/72-dpo-monthly-report.png)
+
+## Consent Management
+
+![Consent Capture](/images/74-consent-capture.png)
+![Consent Withdrawal](/images/75-consent-withdrawal.png)

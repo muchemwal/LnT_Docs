@@ -1,0 +1,48 @@
+# Clinical Handover & Digital Signatures
+
+import { Callout } from 'nextra/components'
+
+## Handover Process
+
+1. Crew enters handover notes (clinical observations, patient condition) — stored encrypted
+2. Crew captures their own digital signature
+3. Receiving party captures their signature with role selection
+4. Both signatures verified → PTF transitions to `handover_completed`
+
+![Handover Notes](/images/41-handover-notes-entry.png)
+![Crew Signature](/images/42-crew-signature-capture.png)
+![Receiver Signature](/images/43-receiver-signature-capture.png)
+
+## Signature Evidence
+
+Each `PTFSignature` record includes:
+
+| Field | Description |
+|---|---|
+| `signature_type` | `booking_referrer`, `pickup_handover_staff`, `patient_consent`, `receiving_staff`, `crew_declaration`, etc. |
+| `signer_role` | Role of the person signing |
+| `signature_url` | S3 key for the signature image |
+| `latitude` / `longitude` | GPS coordinates at time of signing |
+| `device_id` | Device identifier |
+| `signed_at` | Timestamp |
+
+![Signature Evidence](/images/45-signature-evidence.png)
+
+<Callout type="info">
+  Every signature and status transition is evidenced with GPS coordinates, server-side timestamp,
+  device ID, actor user ID, and IP address. This evidence chain supports legal proceedings and
+  regulatory audits.
+</Callout>
+
+## Chain of Responsibility
+
+`PatientCustodyEvent` records track custody changes:
+- `crew_in_custody`, `facility_in_custody`, `police_in_custody`, `escort_in_custody`, `returned_to_crew`
+- Each event records: handed_over_by, received_by_name, received_by_role, signature reference, location
+
+## Mental Health Act Sections
+
+Supported sections: DOLS, Section 2, 3, 4, 135(1), 135(2), 136, 17, CTO Recall.
+
+Each `PTFLegalSection` has associated `PTFLegalDocument` records. All legal section records are
+immutable once created.

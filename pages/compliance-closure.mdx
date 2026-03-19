@@ -1,0 +1,45 @@
+# Compliance Closure
+
+import { Callout } from 'nextra/components'
+
+After handover, the PTF transitions to `compliance_pending`. The crew completes a closure form.
+
+## Completion Checklist
+
+| Field | Type | Description |
+|---|---|---|
+| Vehicle cleaned | Boolean | Infection control confirmation |
+| Incident reported | Boolean | Links to incident reporting if yes |
+| Delay reason | Free text | If applicable |
+| Route used | Free text | Description of route taken |
+| Declaration signed | Boolean | Crew confirms all checks complete |
+
+![Compliance Checklist](/images/46-compliance-checklist.png)
+![Compliance Declaration](/images/47-compliance-declaration.png)
+
+## Final Closure
+
+Once submitted, the PTF transitions to `closed` — a terminal state. The `job_closed_at` timestamp
+is set.
+
+Closure triggers post-job automation:
+- Automatic invoice generation (if rate card exists for the client)
+- Timesheet period update with worked hours
+- **Factorial HR shift sync** (clock_in / clock_out pushed to Factorial)
+- Audit trail finalisation
+
+![PTF Closed](/images/48-ptf-closed-status.png)
+
+## Incident Reporting
+
+If an incident occurred during transfer:
+
+| Field | Description |
+|---|---|
+| `incident_type` | `patient_fall`, `near_miss`, `vehicle_issue`, `clinical_concern`, `other` |
+| `severity` | `standard` or `serious_adverse_event` |
+| Location / description | Encrypted |
+| Persons involved | Encrypted JSON |
+| Investigation | Assigned investigator, tracked through `open → under_review → resolved` |
+
+![Incident Report](/images/77-incident-report-form.png)

@@ -1,0 +1,54 @@
+# Billing & Accounting
+
+import { Callout } from 'nextra/components'
+
+## Billing Workflow
+
+1. Job completion triggers `job-completion-consumer` → auto-generates draft invoice
+2. Invoice line items calculated from client's rate card
+3. Administrator reviews and approves
+4. PDF generated and stored to S3
+5. Approved invoice synced to Xero
+6. Payment status tracked via Xero polling
+
+![Invoice Generated](/images/49-invoice-auto-generated.png)
+![Invoice PDF](/images/50-invoice-approved-pdf.png)
+
+## Invoice Fields
+
+| Field | Description |
+|---|---|
+| `invoice_number` | Auto-generated unique ID |
+| `client_id` | Linked client organisation |
+| `job_id` | Originating transfer job |
+| `line_items` | Array of `{description, amount, vat_rate}` |
+| `status` | `draft → approved → synced → paid` (or `failed`/`overdue`) |
+
+## Rate Cards
+
+Rate cards define billing per client:
+- `billing_type`: `flat_rate`, `per_mile`, `per_hour`, or `combined`
+- `rates`: JSON with rates per priority (routine, urgent, emergency)
+- `effective_from` / `effective_to`: date range validity
+
+## Xero Integration
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /v1/accounting/sync/invoice` | Push approved invoice to Xero |
+| `POST /v1/accounting/sync/contact` | Sync client as Xero contact |
+| `GET /v1/accounting/payment-status/:ref` | Check payment status |
+| `GET /v1/accounting/oauth/callback` | OAuth callback |
+
+![Xero Sync](/images/51-xero-sync-status.png)
+
+## Timesheet → Factorial → Payroll
+
+When a PTF closes, the shift check-in/out data flows to Factorial HR for payroll:
+
+```
+PTF Closed → Timesheet Generated → HR Approval → Factorial Shift Sync → Payroll
+```
+
+![Timesheet Generated](/images/52-timesheet-generated.png)
+![Timesheet Approved](/images/53-timesheet-approved.png)

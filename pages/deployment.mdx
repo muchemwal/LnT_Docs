@@ -1,0 +1,80 @@
+# Deployment Guide
+
+import { Callout } from 'nextra/components'
+
+## Infrastructure Requirements
+
+| Component | Requirement |
+|---|---|
+| PostgreSQL | 15+ with UUID extension |
+| Redis | 7+ (caching, pub/sub, job tracking) |
+| Amazon S3 | Document, signature, PDF storage |
+| Keycloak | 22+ for OIDC identity management |
+| Node.js | 20+ LTS |
+| Docker | Container runtime |
+
+## Environment Variables
+
+```env
+DATABASE_URL=postgresql://user:pass@localhost:5432/landtts
+REDIS_URL=redis://localhost:6379
+KEYCLOAK_BASE_URL=http://localhost:8080
+AWS_S3_BUCKET=landtts-documents
+XERO_CLIENT_ID=...
+XERO_CLIENT_SECRET=...
+FACTORIAL_API_KEY=...
+FACTORIAL_CLIENT_ID=...
+FACTORIAL_CLIENT_SECRET=...
+PHI_ENCRYPTION_KEY=...
+```
+
+## Monorepo Structure
+
+```
+landtts-platform/
+├── apps/
+│   ├── web/              # React (Vite) web app
+│   ├── mobile/           # React Native (Expo) mobile app
+│   ├── docs/             # Nextra documentation site (this site)
+│   └── api/
+│       ├── auth-service/
+│       ├── job-service/
+│       ├── ptf-service/
+│       ├── hr-integration/    # Factorial HR connector
+│       ├── accounting-integration/  # Xero connector
+│       └── ... (19 services)
+├── packages/
+│   ├── db/               # Prisma schema + client
+│   ├── types/            # Shared TypeScript types
+│   ├── shared/           # Shared utilities (withRetry, etc.)
+│   └── design-system/    # UI component library
+└── docs/                 # LaTeX docs, screenshots, API specs
+```
+
+## Screenshot Capture Tool
+
+The `ptf-doc-capture.sh` script guides through capturing all 86 platform screenshots:
+
+```bash
+chmod +x docs/ptf-doc-capture.sh && ./docs/ptf-doc-capture.sh
+```
+
+Screenshots are saved to `docs/images/` and referenced by both the LaTeX documentation
+(`platform-doc.tex`) and this Nextra site.
+
+<Callout>
+  After capturing screenshots, copy them to `apps/docs//images/` for the Nextra site:
+  `cp docs/images/*.png apps/docs//images/`
+</Callout>
+
+## Building the Docs
+
+```bash
+# Development
+cd apps/docs && npm run dev
+
+# Production build
+cd apps/docs && npm run build && npm run start
+```
+
+The docs site runs on port 3100 by default.

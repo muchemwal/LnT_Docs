@@ -1,0 +1,81 @@
+# Mobile Crew Workflow
+
+import { Callout, Steps } from 'nextra/components'
+
+The React Native (Expo) mobile app is the primary interface for crew members during transfers.
+
+## Crew Journey
+
+<Steps>
+
+### Login & Shift Check-In
+
+Crew logs in via Keycloak (`landtts-mobile` client) and checks in with GPS location capture.
+
+![Mobile Login](/images/30-mobile-login.png)
+![Shift Check-In](/images/33-mobile-shift-checkin.png)
+
+### Job Acceptance
+
+Crew views assigned jobs and taps "Accept" to move the job to `accepted` status.
+
+![Job List](/images/31-mobile-job-list.png)
+
+### Navigate to Pickup
+
+"Navigate" button launches native maps (Google Maps / Apple Maps) with pickup coordinates.
+
+![Navigate Pickup](/images/34-mobile-navigate-pickup.png)
+
+### Arrived at Pickup
+
+Captures GPS coordinates and timestamp. Transitions PTF to `arrived_pickup`.
+
+![Arrived Pickup](/images/35-mobile-arrived-pickup.png)
+
+### Risk Review
+
+Crew reviews the risk assessment checklist and confirms understanding before patient loading.
+
+![Risk Review](/images/36-mobile-risk-review.png)
+
+### Patient Loaded — Start Transit
+
+Transitions to `departed_pickup`. GPS tracking activates at 10-second intervals.
+
+![Patient Loaded](/images/38-mobile-patient-loaded.png)
+
+### In-Transit Journey Logging
+
+Crew records journey log entries during transport:
+
+| Log Type | Purpose |
+|---|---|
+| `journey_update` | General progress / route notes |
+| `patient_assessment` | Clinical observation during transit |
+| `restraint_event` | Restraint used (type, duration, justification) |
+| `food_given` | Food/drink provided to patient |
+| `behaviour_note` | Behaviour observation |
+| `incident` | Any incident during transport |
+
+All notes are encrypted (AES-256) and tagged with GPS coordinates.
+
+![Journey Log](/images/37-mobile-journey-log.png)
+
+### Arrived at Destination
+
+Transitions to `arrived_destination`. Triggers clinical handover workflow.
+
+![Arrived Destination](/images/40-mobile-arrived-destination.png)
+
+</Steps>
+
+## GPS Tracking
+
+- Location updates every 10 seconds during active transport
+- Each update: latitude, longitude, accuracy (m), heading (°), speed (km/h), device ID
+- Offline buffering: locations stored locally and uploaded on reconnection (flagged `is_buffered`)
+- History: `GET /v1/gps/jobs/:job_id/history`
+- Current: `GET /v1/gps/jobs/:job_id/current`
+
+![GPS Tracking](/images/39-mobile-gps-tracking.png)
