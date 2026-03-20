@@ -1,0 +1,3723 @@
+openapi: 3.0.3
+info:
+  title: LANDTTS Digital Patient Transport Platform API
+  description: |
+    Comprehensive API for the LANDTTS clinical patient transport management platform.
+    All endpoints require JWT Bearer authentication via Keycloak OIDC.
+    PHI fields are AES-256 encrypted at rest.
+  version: 2.0.0
+  contact:
+    name: Platform Engineering Team
+    email: ops@landtts.co.uk
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8000
+    description: Development API Gateway
+  - url: http://192.168.101.101:8000
+    description: Mobile Development Gateway
+
+tags:
+  - name: Auth
+    description: Authentication, user management, MFA (port 3001)
+  - name: Settings
+    description: Organisation settings and user preferences (port 3001)
+  - name: Jobs
+    description: Transfer job lifecycle and dispatch (port 3002)
+  - name: PTFs
+    description: Patient Transfer Forms CRUD (port 3003)
+  - name: PTF Workflow
+    description: PTF state machine, risks, signatures, compliance (port 3003)
+  - name: GPS
+    description: GPS location tracking (port 3004)
+  - name: Messaging
+    description: Encrypted conversations and messages (port 3005)
+  - name: Shifts
+    description: Shift and rota management (port 3006)
+  - name: Timesheets
+    description: Timesheet periods and HR approval (port 3006)
+  - name: Employees
+    description: Employee records and certifications (port 3007)
+  - name: Clients
+    description: Client organisations and booking portal (port 3008)
+  - name: Incidents
+    description: Incident reporting and investigation (port 3009)
+  - name: Vehicles
+    description: Fleet management and inspections (port 3010)
+  - name: Notifications
+    description: Multi-channel notifications and SSE (port 3011)
+  - name: Invoices
+    description: Invoice lifecycle and billing (port 3012)
+  - name: Rate Cards
+    description: Client billing rate cards (port 3012)
+  - name: Consents
+    description: Consent records and DSAR search (port 3013)
+  - name: Reports
+    description: Analytics, HR reports, DPO reports (port 3014)
+  - name: Audit
+    description: Immutable audit event logging (port 3015)
+  - name: Compliance
+    description: DSAR, erasure, data processors, DPO (port 3016)
+  - name: HR Integration
+    description: Factorial HR synchronisation (port 3017)
+  - name: Accounting
+    description: Xero accounting integration (port 3018)
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Keycloak-issued JWT access token
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            message:
+              type: string
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        pages:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        keycloak_id:
+          type: string
+        email:
+          type: string
+          format: email
+        full_name:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+        user_type:
+          type: string
+          enum: [internal, external]
+        is_active:
+          type: boolean
+        mfa_enabled:
+          type: boolean
+        account_locked:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Role:
+      type: string
+      enum: [administrator, dispatcher, crew_member, hr_manager, client]
+
+    TransferJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference_number:
+          type: string
+        client_id:
+          type: string
+          format: uuid
+        patient_ref:
+          type: string
+        pickup_location:
+          type: object
+        destination:
+          type: object
+        requested_at:
+          type: string
+          format: date-time
+        priority:
+          $ref: '#/components/schemas/JobPriority'
+        special_requirements:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        assigned_crew_id:
+          type: string
+          format: uuid
+          nullable: true
+        assigned_vehicle_id:
+          type: string
+          format: uuid
+          nullable: true
+        status_history:
+          type: array
+          items:
+            type: object
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    JobStatus:
+      type: string
+      enum: [pending, accepted, en_route, on_scene, patient_loaded, completed, cancelled]
+
+    JobPriority:
+      type: string
+      enum: [routine, urgent, emergency]
+
+    PTF:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/PTFStatus'
+        patient_name:
+          type: string
+          description: Decrypted patient name (AES-256 encrypted at rest)
+        patient_dob:
+          type: string
+          description: Decrypted date of birth
+        patient_nhs_number:
+          type: string
+          description: Decrypted NHS number
+        gender:
+          type: string
+          nullable: true
+        ethnicity:
+          type: string
+          nullable: true
+        age:
+          type: integer
+          nullable: true
+        transfer_origin:
+          type: string
+          description: Decrypted pickup address
+        transfer_destination:
+          type: string
+          description: Decrypted destination address
+        transfer_datetime:
+          type: string
+          format: date-time
+        pickup_postcode:
+          type: string
+          nullable: true
+        destination_postcode:
+          type: string
+          nullable: true
+        mileage:
+          type: number
+          nullable: true
+        clinical_notes:
+          type: string
+          nullable: true
+          description: Decrypted clinical notes
+        mobility_requirements:
+          type: string
+          nullable: true
+        equipment_requirements:
+          type: string
+          nullable: true
+        infection_control:
+          type: string
+          nullable: true
+        oxygen_required:
+          type: boolean
+          nullable: true
+        mental_health_act:
+          type: string
+          nullable: true
+        escort_required:
+          type: boolean
+          nullable: true
+        funding_authority:
+          type: string
+          nullable: true
+        referral_source:
+          type: string
+          nullable: true
+          enum: [external_client, internal_team, nhs_trust]
+        booking_date:
+          type: string
+          format: date
+          nullable: true
+        created_by:
+          type: string
+          format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    PTFStatus:
+      type: string
+      enum:
+        - draft
+        - booking
+        - crew_assigned
+        - enroute_pickup
+        - arrived_pickup
+        - departed_pickup
+        - enroute_destination
+        - arrived_destination
+        - handover_completed
+        - compliance_pending
+        - submitted
+        - completed
+        - closed
+
+    PTFRisk:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        risk_code:
+          type: string
+          example: violence
+        value:
+          type: boolean
+        notes:
+          type: string
+          nullable: true
+        recorded_by:
+          type: string
+          format: uuid
+        recorded_at:
+          type: string
+          format: date-time
+
+    PTFSignature:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        signature_type:
+          type: string
+          enum: [booking_referrer, pickup_handover_staff, patient_consent, temporary_facility_handover, return_handover, receiving_staff, crew_declaration, document_verification]
+        signer_role:
+          type: string
+        signature_url:
+          type: string
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        device_id:
+          type: string
+          nullable: true
+        signed_at:
+          type: string
+          format: date-time
+
+    PTFCompliance:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        vehicle_cleaned:
+          type: boolean
+          nullable: true
+        incident_reported:
+          type: boolean
+          nullable: true
+        delay_reason:
+          type: string
+          nullable: true
+        route_used:
+          type: string
+          nullable: true
+        declaration_signed:
+          type: boolean
+          nullable: true
+        closed_by:
+          type: string
+          format: uuid
+          nullable: true
+        closed_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    JourneyLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        log_type:
+          type: string
+          enum: [pickup_event, journey_update, restraint_event, delay_event, clinical_event]
+        notes:
+          type: string
+          nullable: true
+        restraint_used:
+          type: boolean
+          nullable: true
+        restraint_duration:
+          type: integer
+          nullable: true
+        food_given:
+          type: boolean
+          nullable: true
+        behaviour:
+          type: string
+          nullable: true
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        recorded_by:
+          type: string
+          format: uuid
+        recorded_at:
+          type: string
+          format: date-time
+
+    GPSLocation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        device_id:
+          type: string
+        latitude:
+          type: number
+        longitude:
+          type: number
+        accuracy_metres:
+          type: number
+          nullable: true
+        heading:
+          type: number
+          nullable: true
+        speed_kmh:
+          type: number
+          nullable: true
+        recorded_at:
+          type: string
+          format: date-time
+        is_buffered:
+          type: boolean
+
+    Shift:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        crew_member_id:
+          type: string
+          format: uuid
+        vehicle_id:
+          type: string
+          format: uuid
+          nullable: true
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+        role:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published, confirmed, change_requested]
+        confirmation_status:
+          type: string
+          enum: [unconfirmed, confirmed, change_requested]
+        checked_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        checked_out_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    TimesheetPeriod:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        crew_member_id:
+          type: string
+          format: uuid
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        scheduled_minutes:
+          type: integer
+        worked_minutes:
+          type: integer
+        break_minutes:
+          type: integer
+        overtime_minutes:
+          type: integer
+        shift_count:
+          type: integer
+        status:
+          type: string
+          enum: [pending, approved, rejected, synced]
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        full_name:
+          type: string
+        role:
+          type: string
+        dbs_status:
+          type: string
+          enum: [valid, expiring_soon, expired]
+        certifications:
+          type: array
+          items:
+            type: object
+        vehicle_licence_categories:
+          type: array
+          items:
+            type: string
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organisation_name:
+          type: string
+        primary_contact_name:
+          type: string
+        contact_details:
+          type: object
+        billing_address:
+          type: string
+        nhs_trust_ref:
+          type: string
+          nullable: true
+
+    Vehicle:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        registration_number:
+          type: string
+        make:
+          type: string
+        model:
+          type: string
+        vehicle_type:
+          type: string
+        mot_expiry_date:
+          type: string
+          format: date
+        insurance_expiry_date:
+          type: string
+          format: date
+        compliance_status:
+          type: string
+          enum: [compliant, non_compliant, attention_required]
+
+    Invoice:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoice_number:
+          type: string
+        client_id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+          nullable: true
+        line_items:
+          type: array
+          items:
+            type: object
+            properties:
+              description:
+                type: string
+              amount:
+                type: number
+              vat_rate:
+                type: number
+        subtotal:
+          type: number
+        vat_amount:
+          type: number
+        total_amount:
+          type: number
+        status:
+          type: string
+          enum: [draft, approved, synced, failed, overdue, paid]
+        due_date:
+          type: string
+          format: date
+        pdf_s3_key:
+          type: string
+          nullable: true
+
+    RateCard:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        billing_type:
+          type: string
+          enum: [flat_rate, per_mile, per_hour, combined]
+        rates:
+          type: object
+          description: "Rate structure per priority: {routine: {flat, per_mile, per_hour}, urgent: {...}, emergency: {...}}"
+        effective_from:
+          type: string
+          format: date
+        effective_to:
+          type: string
+          format: date
+          nullable: true
+
+    Incident:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference_number:
+          type: string
+        incident_type:
+          type: string
+          enum: [patient_fall, near_miss, vehicle_issue, clinical_concern, other]
+        severity:
+          type: string
+          enum: [standard, serious_adverse_event]
+        status:
+          type: string
+          enum: [open, under_review, resolved]
+
+    ConsentRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        consent_type:
+          type: string
+          enum: [data_processing, data_sharing]
+        consented:
+          type: boolean
+        lawful_basis:
+          type: string
+          nullable: true
+        captured_at:
+          type: string
+          format: date-time
+        withdrawn_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        category:
+          type: string
+          enum: [job_alert, rota_change, cert_expiry, system_alert, message, incident_alert, billing]
+        priority:
+          type: string
+          enum: [critical, high, standard]
+        title:
+          type: string
+        body:
+          type: string
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [one_to_one, group]
+        participant_ids:
+          type: array
+          items:
+            type: string
+            format: uuid
+        created_at:
+          type: string
+          format: date-time
+
+    WorkflowEvent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        performed_by:
+          type: string
+          format: uuid
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+
+    OrgSetting:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        category:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        label:
+          type: string
+        value_type:
+          type: string
+          enum: [string, number, boolean, json, select]
+
+
+paths:
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AUTH SERVICE (port 3001)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate user via Keycloak
+      description: Exchanges credentials with Keycloak token endpoint. Returns JWT tokens or MFA challenge.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+                client_type:
+                  type: string
+                  enum: [web, mobile]
+                  default: web
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token:
+                    type: string
+                  refresh_token:
+                    type: string
+                  expires_in:
+                    type: integer
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials or MFA required
+
+  /v1/auth/callback:
+    get:
+      tags: [Auth]
+      summary: OAuth callback from Keycloak
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect after successful OAuth flow
+
+  /v1/auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh JWT access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: New token pair issued
+
+  /v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout and invalidate session
+      responses:
+        '200':
+          description: Session invalidated
+
+  /v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user profile
+      responses:
+        '200':
+          description: Current user details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/User'
+
+  /v1/auth/users:
+    get:
+      tags: [Auth]
+      summary: List all users (admin only)
+      parameters:
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/Role'
+        - name: is_active
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: User list
+
+  /v1/auth/users/{id}/role:
+    put:
+      tags: [Auth]
+      summary: Update user role
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  $ref: '#/components/schemas/Role'
+      responses:
+        '200':
+          description: Role updated
+
+  /v1/auth/users/{id}/unlock:
+    put:
+      tags: [Auth]
+      summary: Unlock a locked user account
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account unlocked
+
+  /v1/auth/mfa/enforce:
+    post:
+      tags: [Auth]
+      summary: Enforce MFA (TOTP) on a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: MFA enforced via Keycloak CONFIGURE_TOTP
+
+  /v1/auth/mfa/status:
+    get:
+      tags: [Auth]
+      summary: Get MFA status for a user
+      parameters:
+        - name: user_id
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: MFA status
+
+  /v1/auth/client-users:
+    post:
+      tags: [Auth]
+      summary: Create a client user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, full_name, client_id]
+              properties:
+                email:
+                  type: string
+                  format: email
+                full_name:
+                  type: string
+                client_id:
+                  type: string
+                  format: uuid
+                can_book:
+                  type: boolean
+                can_view_all:
+                  type: boolean
+      responses:
+        '201':
+          description: Client user created
+
+  /v1/auth/webhook/keycloak:
+    post:
+      tags: [Auth]
+      summary: Keycloak event webhook
+      description: Receives user lifecycle events from Keycloak for synchronisation.
+      responses:
+        '200':
+          description: Webhook processed
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # SETTINGS (port 3001)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/settings:
+    get:
+      tags: [Settings]
+      summary: List all organisation settings grouped by category
+      responses:
+        '200':
+          description: Settings grouped by category
+    put:
+      tags: [Settings]
+      summary: Bulk upsert organisation settings (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  category:
+                    type: string
+                  key:
+                    type: string
+                  value:
+                    type: string
+      responses:
+        '200':
+          description: Settings updated
+
+  /v1/settings/seed:
+    post:
+      tags: [Settings]
+      summary: Seed default organisation settings (idempotent)
+      responses:
+        '200':
+          description: Default settings seeded
+
+  /v1/preferences:
+    get:
+      tags: [Settings]
+      summary: Get current user preferences
+      responses:
+        '200':
+          description: User preferences
+    put:
+      tags: [Settings]
+      summary: Bulk upsert current user preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                properties:
+                  category:
+                    type: string
+                  key:
+                    type: string
+                  value:
+                    type: string
+      responses:
+        '200':
+          description: Preferences updated
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # JOB SERVICE (port 3002)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/jobs:
+    post:
+      tags: [Jobs]
+      summary: Create a new transfer job
+      description: Creates a transfer job with auto-generated reference number and geocoded addresses.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, patient_ref, pickup_location, destination, requested_at]
+              properties:
+                client_id:
+                  type: string
+                  format: uuid
+                patient_ref:
+                  type: string
+                pickup_location:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                    postcode:
+                      type: string
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                destination:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                    postcode:
+                      type: string
+                    lat:
+                      type: number
+                    lng:
+                      type: number
+                requested_at:
+                  type: string
+                  format: date-time
+                priority:
+                  $ref: '#/components/schemas/JobPriority'
+                special_requirements:
+                  type: string
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/TransferJob'
+    get:
+      tags: [Jobs]
+      summary: List transfer jobs with filters
+      description: Crew members only see their assigned jobs. Supports pagination.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: priority
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobPriority'
+        - name: assigned_crew_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Paginated job list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TransferJob'
+                  meta:
+                    $ref: '#/components/schemas/PaginationMeta'
+
+  /v1/jobs/{id}:
+    get:
+      tags: [Jobs]
+      summary: Get a single transfer job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Job details
+        '403':
+          description: Crew member does not have access to this job
+        '404':
+          description: Job not found
+    patch:
+      tags: [Jobs]
+      summary: Update job fields or transition status
+      description: |
+        Status transitions are validated against the state machine.
+        Operational statuses (en_route, on_scene, patient_loaded) require crew and vehicle assignment.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  $ref: '#/components/schemas/JobStatus'
+                pickup_location:
+                  type: object
+                destination:
+                  type: object
+                priority:
+                  $ref: '#/components/schemas/JobPriority'
+                special_requirements:
+                  type: string
+      responses:
+        '200':
+          description: Job updated
+        '422':
+          description: Invalid transition or validation error
+
+  /v1/jobs/{id}/assign:
+    post:
+      tags: [Jobs]
+      summary: Assign crew and vehicle to a job
+      description: |
+        Performs compliance checks on both crew (DBS, certifications) and vehicle (MOT, insurance).
+        Sends push notification to crew within 5 seconds. Tracks in Redis for 10-minute unaccepted alert.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crew_id, vehicle_id]
+              properties:
+                crew_id:
+                  type: string
+                  format: uuid
+                vehicle_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Crew and vehicle assigned
+        '422':
+          description: Compliance violation
+
+  /v1/jobs/{id}/reassign:
+    post:
+      tags: [Jobs]
+      summary: Reassign crew or vehicle (blocked if completed)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                crew_id:
+                  type: string
+                  format: uuid
+                vehicle_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Reassignment successful
+        '422':
+          description: Cannot reassign completed job
+
+  /v1/jobs/{id}/tracking-link:
+    post:
+      tags: [Jobs]
+      summary: Generate a 24-hour tracking link for a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Tracking link generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                  token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PTF SERVICE (port 3003)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/ptfs:
+    post:
+      tags: [PTFs]
+      summary: Create a new Patient Transfer Form
+      description: Creates a PTF with AES-256 encrypted PHI fields. Also creates the associated TransferJob.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [patient_name, patient_dob, patient_nhs_number, transfer_origin, transfer_destination, transfer_datetime]
+              properties:
+                patient_name:
+                  type: string
+                patient_dob:
+                  type: string
+                patient_nhs_number:
+                  type: string
+                patient_blood_type:
+                  type: string
+                gender:
+                  type: string
+                ethnicity:
+                  type: string
+                clinical_notes:
+                  type: string
+                transfer_origin:
+                  type: string
+                transfer_destination:
+                  type: string
+                transfer_datetime:
+                  type: string
+                  format: date-time
+                pickup_postcode:
+                  type: string
+                destination_postcode:
+                  type: string
+                mileage:
+                  type: number
+                mobility_requirements:
+                  type: string
+                equipment_requirements:
+                  type: string
+                infection_control:
+                  type: string
+                oxygen_required:
+                  type: boolean
+                mental_health_act:
+                  type: string
+                escort_required:
+                  type: boolean
+                funding_authority:
+                  type: string
+                referral_source:
+                  type: string
+                  enum: [external_client, internal_team, nhs_trust]
+                booking_date:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: PTF created in draft status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PTF'
+    get:
+      tags: [PTFs]
+      summary: List PTFs with filters and search
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/PTFStatus'
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by patient name or NHS number
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Paginated PTF list with decrypted PHI
+
+  /v1/ptfs/{id}:
+    get:
+      tags: [PTFs]
+      summary: Get a single PTF with decrypted PHI
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PTF details with decrypted fields
+    patch:
+      tags: [PTFs]
+      summary: Update PTF fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Any PTF fields to update (PHI fields will be re-encrypted)
+      responses:
+        '200':
+          description: PTF updated
+    delete:
+      tags: [PTFs]
+      summary: Soft-delete a PTF (blocked within 8-year retention)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: PTF soft-deleted
+        '422':
+          description: Cannot delete within retention period
+
+  /v1/ptfs/search:
+    get:
+      tags: [PTFs]
+      summary: Search PTFs by NHS number or patient name
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Matching PTFs
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # PTF WORKFLOW (port 3003)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/ptfs/{id}/transition:
+    post:
+      tags: [PTF Workflow]
+      summary: Advance PTF status in the state machine
+      description: |
+        Valid transitions: draft→booking→crew_assigned→enroute_pickup→arrived_pickup
+        →departed_pickup→enroute_destination→arrived_destination→handover_completed
+        →compliance_pending→closed. Each transition sets a timestamp and creates a WorkflowEvent.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_status]
+              properties:
+                target_status:
+                  $ref: '#/components/schemas/PTFStatus'
+      responses:
+        '200':
+          description: Transition successful
+        '422':
+          description: Invalid transition
+
+  /v1/ptfs/{id}/risks:
+    post:
+      tags: [PTF Workflow]
+      summary: Add or update risk checklist items
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [risks]
+              properties:
+                risks:
+                  type: array
+                  items:
+                    type: object
+                    required: [risk_code, value]
+                    properties:
+                      risk_code:
+                        type: string
+                        example: violence
+                      value:
+                        type: boolean
+                      notes:
+                        type: string
+      responses:
+        '201':
+          description: Risks recorded
+    get:
+      tags: [PTF Workflow]
+      summary: Get risk checklist for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Risk checklist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PTFRisk'
+
+  /v1/ptfs/{id}/journey-logs:
+    post:
+      tags: [PTF Workflow]
+      summary: Add a journey log entry
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                log_type:
+                  type: string
+                  enum: [pickup_event, journey_update, restraint_event, delay_event, clinical_event]
+                notes:
+                  type: string
+                  description: Will be AES-256 encrypted
+                restraint_used:
+                  type: boolean
+                restraint_duration:
+                  type: integer
+                  description: Duration in minutes
+                food_given:
+                  type: boolean
+                behaviour:
+                  type: string
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+      responses:
+        '201':
+          description: Journey log created
+    get:
+      tags: [PTF Workflow]
+      summary: List journey logs for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Journey logs (notes decrypted)
+
+  /v1/ptfs/{id}/legal-sections:
+    post:
+      tags: [PTF Workflow]
+      summary: Add a Mental Health Act legal section
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [section_type]
+              properties:
+                section_type:
+                  type: string
+                  enum: [DOLS, SECTION_2, SECTION_3, SECTION_4, SECTION_135_1, SECTION_135_2, SECTION_136, SECTION_17, CTO_RECALL]
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Legal section added
+    get:
+      tags: [PTF Workflow]
+      summary: List legal sections for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Legal sections with associated documents
+
+  /v1/ptfs/{id}/digital-signatures:
+    post:
+      tags: [PTF Workflow]
+      summary: Capture a digital signature with GPS evidence
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [signature_type, signer_role, signature]
+              properties:
+                signature_type:
+                  type: string
+                  enum: [booking_referrer, pickup_handover_staff, patient_consent, temporary_facility_handover, return_handover, receiving_staff, crew_declaration, document_verification]
+                signer_role:
+                  type: string
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                device_id:
+                  type: string
+                signature:
+                  type: string
+                  format: binary
+                  description: Signature image file (max 10 MB)
+      responses:
+        '201':
+          description: Signature captured and stored to S3
+    get:
+      tags: [PTF Workflow]
+      summary: List digital signatures for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Signature records with S3 keys and GPS evidence
+
+  /v1/ptfs/{id}/compliance:
+    post:
+      tags: [PTF Workflow]
+      summary: Submit compliance closure form
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PTFCompliance'
+      responses:
+        '200':
+          description: Compliance record created/updated
+    get:
+      tags: [PTF Workflow]
+      summary: Get compliance record for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Compliance record
+
+  /v1/ptfs/{id}/workflow-events:
+    get:
+      tags: [PTF Workflow]
+      summary: Get audit trail of workflow events
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Workflow event history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/WorkflowEvent'
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # GPS SERVICE (port 3004)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/gps/jobs/{job_id}/history:
+    get:
+      tags: [GPS]
+      summary: Full GPS location history for a job
+      description: Admin and dispatcher only. Returns all recorded GPS points.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: GPS location history
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GPSLocation'
+
+  /v1/gps/jobs/{job_id}/current:
+    get:
+      tags: [GPS]
+      summary: Latest GPS position for a job
+      description: Available to admin, dispatcher, and granted clients.
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Current GPS position
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # MESSAGING SERVICE (port 3005)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/conversations:
+    post:
+      tags: [Messaging]
+      summary: Create a conversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [participant_ids]
+              properties:
+                participant_ids:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                type:
+                  type: string
+                  enum: [one_to_one, group]
+      responses:
+        '201':
+          description: Conversation created
+    get:
+      tags: [Messaging]
+      summary: List conversations for current user
+      responses:
+        '200':
+          description: User's conversations
+
+  /v1/conversations/{id}:
+    get:
+      tags: [Messaging]
+      summary: Get a single conversation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation details
+
+  /v1/conversations/{id}/messages:
+    post:
+      tags: [Messaging]
+      summary: Send a message (PHI detection applied)
+      description: Messages are stored as E2E encrypted ciphertext. PHI detection warns before sending.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ciphertext]
+              properties:
+                ciphertext:
+                  type: string
+                  format: byte
+                message_type:
+                  type: string
+                  enum: [text, image, file]
+      responses:
+        '201':
+          description: Message sent
+    get:
+      tags: [Messaging]
+      summary: List messages in a conversation (paginated)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated messages
+
+  /v1/conversations/{id}/attachments:
+    post:
+      tags: [Messaging]
+      summary: Upload file attachment (20 MB limit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Attachment uploaded
+
+  /v1/messages/{id}/delivered:
+    patch:
+      tags: [Messaging]
+      summary: Mark message as delivered
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Delivery status updated
+
+  /v1/messages/{id}/read:
+    patch:
+      tags: [Messaging]
+      summary: Mark message as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Read status updated
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ROTA SERVICE — SHIFTS (port 3006)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/shifts:
+    post:
+      tags: [Shifts]
+      summary: Create a shift
+      description: Checks for overlapping shifts and Working Time Regulations compliance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crew_member_id, start_at, end_at]
+              properties:
+                crew_member_id:
+                  type: string
+                  format: uuid
+                vehicle_id:
+                  type: string
+                  format: uuid
+                start_at:
+                  type: string
+                  format: date-time
+                end_at:
+                  type: string
+                  format: date-time
+                role:
+                  type: string
+      responses:
+        '201':
+          description: Shift created
+        '422':
+          description: Overlap detected or WTR violation
+    get:
+      tags: [Shifts]
+      summary: List shifts with filters
+      parameters:
+        - name: crew_member_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, published, confirmed, change_requested]
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Shift list
+
+  /v1/shifts/{id}:
+    get:
+      tags: [Shifts]
+      summary: Get a single shift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Shift details
+    patch:
+      tags: [Shifts]
+      summary: Update shift fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Shift updated
+    delete:
+      tags: [Shifts]
+      summary: Soft-delete a shift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Shift soft-deleted
+
+  /v1/shifts/{id}/publish:
+    post:
+      tags: [Shifts]
+      summary: Publish shift and notify crew
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Shift published, crew notified
+
+  /v1/shifts/{id}/change-requests:
+    post:
+      tags: [Shifts]
+      summary: Create a shift change request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                suggested_start_at:
+                  type: string
+                  format: date-time
+                suggested_end_at:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Change request created
+    get:
+      tags: [Shifts]
+      summary: List change requests for a shift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Change requests
+
+  /v1/change-requests/{id}:
+    patch:
+      tags: [Shifts]
+      summary: Approve or reject a change request
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [approved, rejected]
+                review_note:
+                  type: string
+      responses:
+        '200':
+          description: Change request reviewed
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ROTA SERVICE — TIMESHEETS (port 3006)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/timesheets:
+    get:
+      tags: [Timesheets]
+      summary: List timesheet periods (filterable)
+      parameters:
+        - name: crew_member_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected, synced]
+        - name: period_start
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: period_end
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Timesheet periods
+
+  /v1/timesheets/summary:
+    get:
+      tags: [Timesheets]
+      summary: Aggregated KPIs for a date range
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Aggregated timesheet KPIs
+
+  /v1/timesheets/generate:
+    post:
+      tags: [Timesheets]
+      summary: Generate timesheet periods from shift data
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period_start, period_end]
+              properties:
+                period_start:
+                  type: string
+                  format: date
+                period_end:
+                  type: string
+                  format: date
+                crew_member_id:
+                  type: string
+                  format: uuid
+                  description: Optional — generate for specific crew member only
+      responses:
+        '201':
+          description: Timesheet periods generated
+
+  /v1/timesheets/{id}/approve:
+    patch:
+      tags: [Timesheets]
+      summary: HR approves a timesheet period
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                review_note:
+                  type: string
+      responses:
+        '200':
+          description: Timesheet approved
+
+  /v1/timesheets/{id}/reject:
+    patch:
+      tags: [Timesheets]
+      summary: HR rejects a timesheet period
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [review_note]
+              properties:
+                review_note:
+                  type: string
+      responses:
+        '200':
+          description: Timesheet rejected
+
+  /v1/timesheets/{id}/sync:
+    post:
+      tags: [Timesheets]
+      summary: Sync approved timesheet to HR system
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Timesheet synced to Factorial HR
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # EMPLOYEE SERVICE (port 3007)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/employees:
+    post:
+      tags: [Employees]
+      summary: Create an employee record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, full_name, role, employment_start_date, contracted_hours_per_week]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                full_name:
+                  type: string
+                role:
+                  type: string
+                contact_details:
+                  type: object
+                employment_start_date:
+                  type: string
+                  format: date
+                dbs_status:
+                  type: string
+                  enum: [valid, expiring_soon, expired]
+                dbs_expiry_date:
+                  type: string
+                  format: date
+                certifications:
+                  type: array
+                  items:
+                    type: object
+                vehicle_licence_categories:
+                  type: array
+                  items:
+                    type: string
+                contracted_hours_per_week:
+                  type: number
+      responses:
+        '201':
+          description: Employee created
+    get:
+      tags: [Employees]
+      summary: List employees (admin/hr_manager)
+      responses:
+        '200':
+          description: Employee list
+
+  /v1/employees/{id}:
+    get:
+      tags: [Employees]
+      summary: Get employee details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Employee details
+    patch:
+      tags: [Employees]
+      summary: Update employee record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Employee updated
+
+  /v1/employees/{id}/documents:
+    post:
+      tags: [Employees]
+      summary: Upload compliance document to S3
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Document uploaded
+
+  /v1/employees/{id}/absences:
+    post:
+      tags: [Employees]
+      summary: Create an absence record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, start_date, end_date]
+              properties:
+                type:
+                  type: string
+                  enum: [sick, annual_leave, other]
+                start_date:
+                  type: string
+                  format: date-time
+                end_date:
+                  type: string
+                  format: date-time
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Absence created
+    get:
+      tags: [Employees]
+      summary: List absences for an employee
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Absence list
+
+  /v1/absences/{id}:
+    patch:
+      tags: [Employees]
+      summary: Update an absence record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Absence updated
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CLIENT SERVICE (port 3008)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/clients:
+    post:
+      tags: [Clients]
+      summary: Create a client organisation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [organisation_name, primary_contact_name, billing_address]
+              properties:
+                organisation_name:
+                  type: string
+                primary_contact_name:
+                  type: string
+                contact_details:
+                  type: object
+                billing_address:
+                  type: string
+                nhs_trust_ref:
+                  type: string
+      responses:
+        '201':
+          description: Client created
+    get:
+      tags: [Clients]
+      summary: List clients (admin/dispatcher)
+      responses:
+        '200':
+          description: Client list
+
+  /v1/clients/{id}:
+    get:
+      tags: [Clients]
+      summary: Get client details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client details
+    patch:
+      tags: [Clients]
+      summary: Update client record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client updated
+
+  /v1/clients/{id}/booking-requests:
+    post:
+      tags: [Clients]
+      summary: Submit a booking request (client role)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pickup_location:
+                  type: object
+                destination:
+                  type: object
+                requested_at:
+                  type: string
+                  format: date-time
+                priority:
+                  $ref: '#/components/schemas/JobPriority'
+                special_requirements:
+                  type: string
+      responses:
+        '201':
+          description: Booking request submitted
+
+  /v1/clients/{id}/notes:
+    post:
+      tags: [Clients]
+      summary: Add a note to a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+      responses:
+        '201':
+          description: Note added
+    get:
+      tags: [Clients]
+      summary: List notes for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Client notes
+
+  /v1/clients/{id}/documents:
+    post:
+      tags: [Clients]
+      summary: Upload a document for a client
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Document uploaded to S3
+
+  /v1/clients/{id}/bookings:
+    get:
+      tags: [Clients]
+      summary: List booking history for a client organisation
+      description: Client users see only their own bookings unless can_view_all is true.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated booking history
+
+  /v1/clients/{id}/bookings/{jobId}/duplicate:
+    post:
+      tags: [Clients]
+      summary: Duplicate a booking (copies patient data to new draft)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: Booking duplicated with new draft PTF
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # INCIDENT SERVICE (port 3009)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/incidents:
+    post:
+      tags: [Incidents]
+      summary: Create a new incident report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [incident_type, incident_datetime, location, description]
+              properties:
+                incident_type:
+                  type: string
+                  enum: [patient_fall, near_miss, vehicle_issue, clinical_concern, other]
+                incident_datetime:
+                  type: string
+                  format: date-time
+                location:
+                  type: string
+                  description: Will be encrypted
+                description:
+                  type: string
+                  description: Will be encrypted
+                persons_involved:
+                  type: object
+                  description: Will be encrypted
+                immediate_actions:
+                  type: string
+                  description: Will be encrypted
+                severity:
+                  type: string
+                  enum: [standard, serious_adverse_event]
+      responses:
+        '201':
+          description: Incident created
+    get:
+      tags: [Incidents]
+      summary: List incidents (admin/hr_manager only)
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [open, under_review, resolved]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [standard, serious_adverse_event]
+      responses:
+        '200':
+          description: Incident list
+
+  /v1/incidents/report:
+    get:
+      tags: [Incidents]
+      summary: Generate incident report (CSV/PDF)
+      parameters:
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv, pdf]
+      responses:
+        '200':
+          description: Incident report file
+
+  /v1/incidents/{id}:
+    get:
+      tags: [Incidents]
+      summary: Get a single incident
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Incident details
+    patch:
+      tags: [Incidents]
+      summary: Update incident fields or status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [open, under_review, resolved]
+                assigned_investigator:
+                  type: string
+                  format: uuid
+                resolution_notes:
+                  type: string
+      responses:
+        '200':
+          description: Incident updated
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # VEHICLE SERVICE (port 3010)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/vehicles:
+    post:
+      tags: [Vehicles]
+      summary: Create a vehicle (admin only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [registration_number, make, model, vehicle_type, mot_expiry_date, insurance_expiry_date]
+              properties:
+                registration_number:
+                  type: string
+                make:
+                  type: string
+                model:
+                  type: string
+                vehicle_type:
+                  type: string
+                mot_expiry_date:
+                  type: string
+                  format: date
+                insurance_expiry_date:
+                  type: string
+                  format: date
+                equipment_list:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Vehicle created
+    get:
+      tags: [Vehicles]
+      summary: List vehicles (admin/dispatcher)
+      responses:
+        '200':
+          description: Vehicle list
+
+  /v1/vehicles/fleet-overview:
+    get:
+      tags: [Vehicles]
+      summary: Fleet overview with compliance status
+      responses:
+        '200':
+          description: Fleet overview dashboard data
+
+  /v1/vehicles/{id}:
+    get:
+      tags: [Vehicles]
+      summary: Get vehicle details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle details
+    patch:
+      tags: [Vehicles]
+      summary: Update vehicle record (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vehicle updated
+
+  /v1/vehicles/{id}/inspections:
+    post:
+      tags: [Vehicles]
+      summary: Create a vehicle inspection
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [inspection_date, checklist_results, overall_passed]
+              properties:
+                inspection_date:
+                  type: string
+                  format: date
+                checklist_results:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      item:
+                        type: string
+                      passed:
+                        type: boolean
+                      notes:
+                        type: string
+                overall_passed:
+                  type: boolean
+      responses:
+        '201':
+          description: Inspection recorded
+    get:
+      tags: [Vehicles]
+      summary: List inspections for a vehicle
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Inspection history
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # NOTIFICATION SERVICE (port 3011)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/notifications:
+    post:
+      tags: [Notifications]
+      summary: Create and fan out a notification (internal)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, category, title, body]
+              properties:
+                user_id:
+                  type: string
+                  format: uuid
+                category:
+                  type: string
+                  enum: [job_alert, rota_change, cert_expiry, system_alert, message, incident_alert, billing]
+                priority:
+                  type: string
+                  enum: [critical, high, standard]
+                title:
+                  type: string
+                body:
+                  type: string
+                  description: Must NOT contain PHI — job reference only
+      responses:
+        '201':
+          description: Notification created and delivered
+    get:
+      tags: [Notifications]
+      summary: List notifications for authenticated user
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: is_read
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Paginated notification list
+
+  /v1/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification marked as read
+
+  /v1/notifications/stream:
+    get:
+      tags: [Notifications]
+      summary: SSE stream for real-time notifications
+      description: Server-Sent Events stream delivering notifications in real time.
+      responses:
+        '200':
+          description: SSE event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BILLING SERVICE — INVOICES (port 3012)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/invoices:
+    post:
+      tags: [Invoices]
+      summary: Create a draft invoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, line_items, subtotal, vat_amount, total_amount, due_date]
+              properties:
+                client_id:
+                  type: string
+                  format: uuid
+                job_id:
+                  type: string
+                  format: uuid
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      description:
+                        type: string
+                      amount:
+                        type: number
+                      vat_rate:
+                        type: number
+                subtotal:
+                  type: number
+                vat_amount:
+                  type: number
+                total_amount:
+                  type: number
+                due_date:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Draft invoice created
+    get:
+      tags: [Invoices]
+      summary: List invoices (filterable)
+      parameters:
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, approved, synced, failed, overdue, paid]
+        - name: sync_status
+          in: query
+          schema:
+            type: string
+            enum: [pending, synced, failed]
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Paginated invoice list
+
+  /v1/invoices/{id}:
+    get:
+      tags: [Invoices]
+      summary: Get a single invoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice details
+    patch:
+      tags: [Invoices]
+      summary: Update invoice fields
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice updated
+
+  /v1/invoices/{id}/approve:
+    post:
+      tags: [Invoices]
+      summary: Approve invoice, generate PDF, store to S3
+      description: Transitions invoice from draft to approved. Generates PDF and uploads to S3.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice approved with PDF generated
+        '422':
+          description: Invoice not in draft status
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # BILLING SERVICE — RATE CARDS (port 3012)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/rate-cards:
+    post:
+      tags: [Rate Cards]
+      summary: Create a rate card for a client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id, billing_type, rates, effective_from]
+              properties:
+                client_id:
+                  type: string
+                  format: uuid
+                billing_type:
+                  type: string
+                  enum: [flat_rate, per_mile, per_hour, combined]
+                rates:
+                  type: object
+                  description: "{routine: {flat, per_mile, per_hour}, urgent: {...}, emergency: {...}}"
+                effective_from:
+                  type: string
+                  format: date
+                effective_to:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: Rate card created
+    get:
+      tags: [Rate Cards]
+      summary: List rate cards (filterable by client_id)
+      parameters:
+        - name: client_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rate card list
+
+  /v1/rate-cards/{id}:
+    patch:
+      tags: [Rate Cards]
+      summary: Update a rate card
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Rate card updated
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # CONSENT SERVICE (port 3013)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/consents:
+    post:
+      tags: [Consents]
+      summary: Capture a new consent record
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ptf_id, patient_nhs_number, consent_type, consented]
+              properties:
+                ptf_id:
+                  type: string
+                  format: uuid
+                patient_nhs_number:
+                  type: string
+                  description: Will be AES-256 encrypted
+                consent_type:
+                  type: string
+                  enum: [data_processing, data_sharing]
+                consented:
+                  type: boolean
+                representative_name:
+                  type: string
+                representative_reason:
+                  type: string
+                lawful_basis:
+                  type: string
+                  description: Required if consented is false (vital_interests, legitimate_task, etc.)
+      responses:
+        '201':
+          description: Consent recorded
+
+  /v1/consents/search:
+    get:
+      tags: [Consents]
+      summary: DSAR search by NHS number or PTF ID (admin only)
+      parameters:
+        - name: nhs_number
+          in: query
+          schema:
+            type: string
+        - name: ptf_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Matching consent records
+
+  /v1/consents/{id}:
+    get:
+      tags: [Consents]
+      summary: Get a single consent record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Consent record details
+
+  /v1/consents/{id}/withdraw:
+    patch:
+      tags: [Consents]
+      summary: Withdraw consent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [withdrawal_reason]
+              properties:
+                withdrawal_reason:
+                  type: string
+      responses:
+        '200':
+          description: Consent withdrawn, erasure evaluation triggered
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # REPORTING SERVICE (port 3014)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/reports/analytics:
+    get:
+      tags: [Reports]
+      summary: KPI and HR analytics with filters
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [operational, hr]
+      responses:
+        '200':
+          description: Analytics data with KPIs
+
+  /v1/reports/export:
+    get:
+      tags: [Reports]
+      summary: Export report as PDF or CSV
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [operational, hr]
+        - name: format
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [pdf, csv]
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Report file download
+
+  /v1/reports/dpo:
+    get:
+      tags: [Reports]
+      summary: DPO monthly data processing report
+      description: Returns PHI volume, DSAR count, breach events, and consent statistics.
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+            description: "YYYY-MM format"
+      responses:
+        '200':
+          description: DPO report data
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # AUDIT SERVICE (port 3015)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/audit/events:
+    post:
+      tags: [Audit]
+      summary: Record an audit event (INSERT-only)
+      description: |
+        Immutable audit log. No PUT, PATCH, or DELETE endpoints exist.
+        Events include actor, IP, resource, previous/new values.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [event_type, actor_id, resource_id]
+              properties:
+                event_type:
+                  type: string
+                  example: JOB_CREATED
+                actor_id:
+                  type: string
+                  format: uuid
+                actor_ip:
+                  type: string
+                resource_type:
+                  type: string
+                resource_id:
+                  type: string
+                  format: uuid
+                previous_value:
+                  type: object
+                new_value:
+                  type: object
+      responses:
+        '201':
+          description: Audit event recorded (immutable)
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # COMPLIANCE SERVICE (port 3016)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/admin/dsar:
+    post:
+      tags: [Compliance]
+      summary: Process a Data Subject Access Request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nhs_number]
+              properties:
+                nhs_number:
+                  type: string
+                requester_name:
+                  type: string
+                requester_relationship:
+                  type: string
+      responses:
+        '200':
+          description: DSAR processed, data package returned
+
+  /v1/admin/erasure:
+    post:
+      tags: [Compliance]
+      summary: Right-to-erasure workflow
+      description: Blocked for records within 8-year clinical retention period.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nhs_number]
+              properties:
+                nhs_number:
+                  type: string
+                reason:
+                  type: string
+      responses:
+        '200':
+          description: Erasure processed or blocked by retention policy
+
+  /v1/admin/data-processors:
+    get:
+      tags: [Compliance]
+      summary: List registered data processors
+      responses:
+        '200':
+          description: Data processor registry
+    post:
+      tags: [Compliance]
+      summary: Register a new data processor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, purpose]
+              properties:
+                name:
+                  type: string
+                purpose:
+                  type: string
+                contract_reference:
+                  type: string
+                data_categories:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Data processor registered
+
+  /v1/admin/data-processors/{id}:
+    patch:
+      tags: [Compliance]
+      summary: Update a data processor record
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Data processor updated
+
+  /v1/admin/dpo-report:
+    get:
+      tags: [Compliance]
+      summary: Monthly DPO report
+      description: PHI volume, DSAR count, breach events, consent statistics.
+      parameters:
+        - name: month
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DPO report data
+
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # HR INTEGRATION (port 3017)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/hr/sync/employee:
+    post:
+      tags: [HR Integration]
+      summary: Sync an employee to Factorial HR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id]
+              properties:
+                employee_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Employee synced to Factorial HR
+
+  /v1/hr/sync/shifts:
+    post:
+      tags: [HR Integration]
+      summary: Sync shifts to Factorial HR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                period_start:
+                  type: string
+                  format: date
+                period_end:
+                  type: string
+                  format: date
+                crew_member_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Shifts synced
+
+  /v1/hr/sync/absence:
+    post:
+      tags: [HR Integration]
+      summary: Sync an absence record to Factorial HR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [absence_id]
+              properties:
+                absence_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Absence synced
+
+  /v1/hr/export/worked-hours:
+    post:
+      tags: [HR Integration]
+      summary: Export worked hours for a pay period
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [period_start, period_end]
+              properties:
+                period_start:
+                  type: string
+                  format: date
+                period_end:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: Worked hours export data
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ACCOUNTING INTEGRATION (port 3018)
+  # ═══════════════════════════════════════════════════════════════════════════
+
+  /v1/accounting/sync/invoice:
+    post:
+      tags: [Accounting]
+      summary: Sync an invoice to Xero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invoice_id]
+              properties:
+                invoice_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Invoice synced to Xero
+
+  /v1/accounting/sync/contact:
+    post:
+      tags: [Accounting]
+      summary: Sync a client contact to Xero
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [client_id]
+              properties:
+                client_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Contact synced to Xero
+
+  /v1/accounting/payment-status/{externalRef}:
+    get:
+      tags: [Accounting]
+      summary: Get payment status from Xero
+      parameters:
+        - name: externalRef
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment status from Xero
+
+  /v1/accounting/oauth/callback:
+    get:
+      tags: [Accounting]
+      summary: Xero OAuth 2.0 callback
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect after OAuth flow
+
+  /v1/integration/health:
+    get:
+      tags: [Accounting, HR Integration]
+      summary: Integration health dashboard
+      description: Returns last sync timestamps and failed record counts for accounting and HR integrations.
+      responses:
+        '200':
+          description: Integration health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  last_sync_at:
+                    type: string
+                    format: date-time
+                  failed_records:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [healthy, degraded, error]

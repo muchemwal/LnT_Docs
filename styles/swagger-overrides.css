@@ -1,0 +1,56 @@
+/* Make Swagger UI blend with Nextra theme */
+.swagger-container .swagger-ui {
+  font-family: inherit;
+}
+
+.swagger-container .swagger-ui .info {
+  margin: 0;
+}
+
+.swagger-container .swagger-ui .info .title {
+  display: none; /* Nextra page title is enough */
+}
+
+.swagger-container .swagger-ui .scheme-container {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+}
+
+.swagger-container .swagger-ui .opblock-tag {
+  border-bottom-color: var(--nextra-border-color, #e5e7eb);
+}
+
+/* Dark mode support */
+:is(html[class~="dark"]) .swagger-container .swagger-ui,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .opblock-tag,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .opblock-description-wrapper p,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .opblock .opblock-summary-description,
+:is(html[class~="dark"]) .swagger-container .swagger-ui table thead tr th,
+:is(html[class~="dark"]) .swagger-container .swagger-ui table thead tr td,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .parameter__name,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .parameter__type,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .response-col_status,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .response-col_description,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .model-title,
+:is(html[class~="dark"]) .swagger-container .swagger-ui .model {
+  color: #e5e7eb;
+}
+
+:is(html[class~="dark"]) .swagger-container .swagger-ui .opblock-tag {
+  border-bottom-color: #374151;
+}
+
+:is(html[class~="dark"]) .swagger-container .swagger-ui input[type=text] {
+  background: #1f2937;
+  color: #e5e7eb;
+}
+
+:is(html[class~="dark"]) .swagger-container .swagger-ui .btn {
+  color: #e5e7eb;
+}
+
+:is(html[class~="dark"]) .swagger-container .swagger-ui select {
+  background: #1f2937;
+  color: #e5e7eb;
+}

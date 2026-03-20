@@ -1,74 +1,19 @@
+---
+title: API Reference
+---
+
+import { Callout } from 'nextra/components'
+import dynamic from 'next/dynamic'
+
+export const SwaggerUI = dynamic(() => import('../components/SwaggerUI'), { ssr: false })
+
 # API Reference
 
-import { Callout, Tabs, Tab } from 'nextra/components'
+<Callout type="info">
+  All endpoints require `Authorization: Bearer JWT` issued by Keycloak.
+  Gateway: `http://localhost:8000` (development). PHI fields are AES-256 encrypted at rest.
+</Callout>
 
-All endpoints require `Authorization: Bearer <JWT>` issued by Keycloak.
-Gateway: `http://localhost:8000` (development).
+Use the filter box below to search endpoints by tag or path. Expand any operation to see request/response schemas, parameters, and example payloads.
 
-## PTF Service (port 3003)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/ptfs` | List PTFs (paginated) |
-| `POST` | `/v1/ptfs` | Create PTF + TransferJob |
-| `GET` | `/v1/ptfs/:id` | Get PTF by ID |
-| `PATCH` | `/v1/ptfs/:id` | Update PTF |
-| `DELETE` | `/v1/ptfs/:id` | Soft-delete PTF |
-| `POST` | `/v1/ptfs/:id/transition` | Workflow status transition |
-| `POST` | `/v1/ptfs/:id/risks` | Add/update risk assessment |
-| `POST` | `/v1/ptfs/:id/signatures` | Upload signature |
-| `POST` | `/v1/ptfs/:id/journey-logs` | Add journey log entry |
-| `POST` | `/v1/ptfs/:id/legal-sections` | Add MHA legal section |
-| `GET` | `/v1/ptfs/search` | Search PTFs by NHS number |
-
-## Job Service (port 3002)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/jobs` | List jobs |
-| `POST` | `/v1/jobs` | Create transfer job |
-| `GET` | `/v1/jobs/:id` | Get job by ID |
-| `PATCH` | `/v1/jobs/:id` | Update job |
-| `POST` | `/v1/jobs/:id/assign` | Assign crew + vehicle (compliance check) |
-
-## HR Integration (port 3017)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/v1/hr/sync/employee` | Sync employee → Factorial |
-| `POST` | `/v1/hr/sync/shifts` | Sync shifts → Factorial |
-| `POST` | `/v1/hr/sync/absence` | Sync absence → Factorial |
-| `POST` | `/v1/hr/sync/clock-in` | Clock in → Factorial |
-| `POST` | `/v1/hr/sync/clock-out` | Clock out → Factorial |
-| `POST` | `/v1/hr/sync/break-start` | Break start → Factorial |
-| `POST` | `/v1/hr/sync/break-end` | Break end → Factorial |
-| `GET` | `/v1/hr/shifts` | Read shifts from Factorial |
-| `POST` | `/v1/hr/export/worked-hours` | Export pay period |
-| `GET` | `/v1/integration/health` | Health check |
-
-## Auth Service (port 3001)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/v1/auth/login` | Login (Keycloak exchange) |
-| `POST` | `/v1/auth/refresh` | Refresh token |
-| `POST` | `/v1/auth/logout` | Logout |
-| `GET` | `/v1/auth/me` | Current user profile |
-| `POST` | `/v1/auth/mfa/enforce` | Enforce MFA on user |
-| `GET` | `/v1/auth/mfa/status` | MFA status |
-
-## Billing Service (port 3012)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/v1/invoices` | Create invoice |
-| `POST` | `/v1/invoices/:id/approve` | Approve + generate PDF |
-| `GET` | `/v1/rate-cards` | List rate cards |
-
-## GPS Service (port 3004)
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/v1/gps/jobs/:id/history` | GPS location history |
-| `GET` | `/v1/gps/jobs/:id/current` | Current position |
-| WebSocket | `/ws/gps` | Live GPS streaming |
+<SwaggerUI />
