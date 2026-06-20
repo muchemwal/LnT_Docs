@@ -4,14 +4,14 @@ import { Callout } from 'nextra/components'
 
 ## System Description
 
-LANDTTS is a microservices-based platform comprising **19 independently deployable services**, a React
+LANDTTS is a microservices-based platform comprising **18 independently deployable services**, a React
 web application for dispatchers and administrators, and a React Native (Expo) mobile application for
-crew members. All services communicate through a central API gateway and share a PostgreSQL database
-via Prisma ORM.
+crew members. All services communicate through a **Kong 3.7 API Gateway** (DB-less declarative config)
+and share a PostgreSQL 16 database via Prisma 5.13 ORM.
 
 The platform supports five user roles: `administrator`, `dispatcher`, `crew_member`, `hr_manager`,
 and `client`. Each role has precisely scoped permissions enforced at the API middleware layer through
-Keycloak-issued JWT tokens.
+Keycloak-issued JWT tokens (PKCE S256, 60-minute TTL).
 
 ![App Shell Navigation](/images/05-app-shell-navigation.png)
 
@@ -19,57 +19,89 @@ Keycloak-issued JWT tokens.
 
 | Role | Description |
 |---|---|
-| `administrator` | Full platform access. Manages users, settings, billing, compliance. |
+| `administrator` | Full platform access. Manages users, settings, billing, compliance, services. |
 | `dispatcher` | Creates bookings, assigns crew/vehicles, monitors dispatch board. |
-| `crew_member` | Mobile-focused. Accepts jobs, records journey events, captures signatures. |
+| `crew_member` | Mobile-focused. Accepts jobs, records journey events, captures signatures, biometric auth. |
 | `hr_manager` | Manages employees, certifications, shifts, timesheets, absences. |
-| `client` | External portal. Views booking history, submits requests, duplicates bookings. |
+| `client` | External portal. Views booking history, submits requests, duplicates bookings. Multi-user per organisation via `ClientUser`. |
 
 ## Microservices Map
 
 | Service | Port | Responsibility |
 |---|---|---|
-| auth-service | 3001 | Authentication, MFA, user management |
-| job-service | 3002 | Transfer job CRUD, crew assignment, dispatch WebSocket |
-| ptf-service | 3003 | PTF CRUD, workflow state machine, signatures, risks |
-| gps-service | 3004 | GPS location ingestion (WebSocket), history queries |
+| auth-service | 3001 | Authentication (OIDC PKCE), MFA, user management, org settings, preferences |
+| job-service | 3002 | Transfer job CRUD, crew assignment, dispatch WebSocket, status machine, unaccepted-job alerts |
+| ptf-service | 3003 | PTF CRUD, workflow state machine, signatures, risks, safeguarding, handover checklists |
+| gps-service | 3004 | GPS location ingestion (native WebSocket via `ws`), position broadcasting, history queries |
 | messaging-service | 3005 | Encrypted conversations, PHI detection |
-| rota-service | 3006 | Shift management, WTR checks, timesheets |
-| employee-service | 3007 | Employee records, certifications, DBS tracking |
-| client-service | 3008 | Client organisations, booking history, duplicates |
-| incident-service | 3009 | Incident reporting, investigation tracking |
+| rota-service | 3006 | Shift management, WTR checks, timesheets, shift change requests |
+| employee-service | 3007 | Employee records, certifications, DBS tracking, absences |
+| client-service | 3008 | Client organisations, booking history, client users, duplicates |
+| incident-service | 3009 | Incident reporting, investigation tracking, escalation |
 | vehicle-service | 3010 | Fleet management, inspections, compliance |
-| notification-service | 3011 | Multi-channel notifications, SSE streaming |
+| notification-service | 3011 | Multi-channel notifications (SSE, push APNs/FCM, email, SMS via Twilio) |
 | billing-service | 3012 | Invoice lifecycle, rate cards, PDF generation |
 | consent-service | 3013 | Consent capture, DSAR search |
 | reporting-service | 3014 | Analytics, HR reports, DPO reports |
-| audit-service | 3015 | Immutable audit event storage (INSERT-only) |
-| compliance-service | 3016 | DSAR, right-to-erasure, retention enforcement |
-| hr-integration | 3017 | Factorial HR sync (employees, shifts, absences) |
-| accounting-integration | 3018 | Xero sync (invoices, contacts, payments) |
+| audit-service | 3015 | Immutable audit event storage (INSERT-only, separate PostgreSQL DB on port 5433) |
+| compliance-service | 3016 | Breach detection, retention enforcement, DSAR, right-to-erasure (**Docker-only**) |
+| hr-integration | 3017 | Factorial HR sync + Deel REST v2 connector (employees, shifts, absences) |
+| accounting-integration | 3018 | Xero sync (invoices, contacts, payments), OAuth 2.0 token management |
+
+<Callout type="info">
+  The compliance-service (port 3016) runs exclusively in Docker and is not part of the local
+  development health-check script. It handles breach detection, retention policy enforcement,
+  and automated data lifecycle management.
+</Callout>
 
 ## High-Level Architecture
 
 ```
-Presentation ─── React Web (Vite) + React Native Mobile (Expo SDK 50)
+Presentation ─── React 18 Web (Vite 5) + React Native Mobile (Expo SDK 50)
        │
-  API Gateway ─── Port 8000, routes by URL prefix
+  API Gateway ─── Kong 3.7 (DB-less), port 8000/8443, rate limiting 100 req/min
        │
-  Service Layer ── 19 microservices (ports 3001–3018)
+  Service Layer ── 18 microservices (ports 3001–3018)
        │
-  Data Layer ───── PostgreSQL (Prisma) + Redis (cache/pub-sub) + S3 (binary)
+  Data Layer ───── PostgreSQL 16 (Prisma 5.13) + Redis 7 (cache/pub-sub/streams) + MinIO (S3)
        │
-  Identity ─────── Keycloak OIDC with TOTP MFA
+  Identity ─────── Keycloak 24 OIDC with PKCE S256 + TOTP MFA
        │
-  Integrations ─── Xero │ Factorial HR │ Mapbox
+  Integrations ─── Xero │ Factorial HR │ Deel │ Mapbox │ Twilio │ APNs/FCM
 ```
+
+## Web Application Pages
+
+| Route | Access | Description |
+|---|---|---|
+| `/dashboard` | All authenticated | Overview KPIs and recent activity |
+| `/dispatch` | dispatcher, administrator | Real-time dispatch board |
+| `/ptfs` | dispatcher, administrator, client | PTF list with search/filter |
+| `/ptfs/:id` | dispatcher, administrator, client | PTF detail view |
+| `/rota` | hr_manager, administrator | Rota canvas / shift scheduling |
+| `/employees` | hr_manager, administrator | Employee management |
+| `/clients` | dispatcher, administrator, client | Client organisations |
+| `/vehicles` | administrator | Fleet management |
+| `/incidents` | administrator | Incident dashboard |
+| `/billing` | administrator | Billing dashboard |
+| `/analytics` | administrator, hr_manager | KPI analytics |
+| `/timesheets` | administrator, hr_manager | Timesheet approval workflow |
+| `/audit` | administrator | Audit log viewer |
+| `/consent` | administrator | Consent management |
+| `/users` | administrator | User management |
+| `/settings` | All authenticated | User/org settings |
+| `/services` | administrator | Service manager |
+| `/bookings` | client, administrator, dispatcher | Client portal |
+| `/track/:token` | Public | Live tracking link (24-hour expiry) |
 
 ## Operational Workflows
 
 - Routine patient transfers (scheduled, non-emergency)
 - Urgent and emergency transfers with priority escalation
 - Mental Health Act section transfers with legal documentation
-- Multi-leg journeys with accommodation, meals, and expense tracking
+- **Multi-leg journeys** with segments, accommodation, meals, and expense tracking
 - Return leg transfers within the same booking
 - Client-initiated booking requests through the portal
 - External referral intake with prepopulated referral source
+- **Multi-crew assignments** with roles (driver, medic, escort, supervisor, relief_driver)
+- **Trip intelligence** — geofence detection, smart status prompts, WTR break reminders

@@ -6,26 +6,77 @@ import { Callout } from 'nextra/components'
 
 | Component | Requirement |
 |---|---|
-| PostgreSQL | 15+ with UUID extension |
-| Redis | 7+ (caching, pub/sub, job tracking) |
-| Amazon S3 | Document, signature, PDF storage |
-| Keycloak | 22+ for OIDC identity management |
+| PostgreSQL | 16+ (primary on 5432, audit on 5433) |
+| Redis | 7+ (caching, pub/sub, streams) |
+| MinIO | S3-compatible object storage (signatures, PDFs, documents) |
+| Keycloak | 24+ for OIDC identity management (PKCE S256) |
+| Kong | 3.7 API Gateway (DB-less declarative config) |
 | Node.js | 20+ LTS |
 | Docker | Container runtime |
+| npm | 10.5+ (package manager) |
+| Turborepo | 2.0+ (monorepo orchestration) |
+
+## Deployment Options
+
+<Callout type="info">
+  The platform supports two deployment strategies: Kubernetes (AWS EKS) for production scale,
+  and single-EC2 (Docker Compose + Caddy) for smaller deployments.
+</Callout>
+
+### Option 1 — Kubernetes (AWS EKS)
+
+Full Kubernetes deployment with 26 YAML manifests covering all services and infrastructure:
+- Service mesh via Linkerd (mTLS between services)
+- Horizontal pod autoscaling
+- Persistent volume claims for databases
+- Ingress via Kong
+
+### Option 2 — Single EC2 (Docker Compose + Caddy)
+
+Suitable for smaller deployments on a single `t3.medium` instance (eu-west-2):
+- All services run via Docker Compose
+- Caddy reverse proxy with automatic Let's Encrypt HTTPS
+- Simplified operational overhead
 
 ## Environment Variables
 
 ```env
+# Database
 DATABASE_URL=postgresql://user:pass@localhost:5432/landtts
+AUDIT_DATABASE_URL=postgresql://user:pass@localhost:5433/landtts_audit
+
+# Redis
 REDIS_URL=redis://localhost:6379
+REDIS_PASSWORD=...
+
+# Identity
 KEYCLOAK_BASE_URL=http://localhost:8080
+KEYCLOAK_REALM=landtts
+
+# Object Storage (MinIO / S3)
 AWS_S3_BUCKET=landtts-documents
+MINIO_ENDPOINT=http://localhost:9000
+MINIO_ROOT_USER=...
+MINIO_ROOT_PASSWORD=...
+
+# Integrations
 XERO_CLIENT_ID=...
 XERO_CLIENT_SECRET=...
 FACTORIAL_API_KEY=...
 FACTORIAL_CLIENT_ID=...
 FACTORIAL_CLIENT_SECRET=...
+FACTORIAL_WEBHOOK_SECRET=...
+DEEL_API_TOKEN=...
+
+# Security
 PHI_ENCRYPTION_KEY=...
+
+# Notifications
+TWILIO_ACCOUNT_SID=...
+TWILIO_AUTH_TOKEN=...
+APNS_KEY_ID=...
+APNS_TEAM_ID=...
+FCM_SERVER_KEY=...
 ```
 
 ## Monorepo Structure
@@ -33,38 +84,79 @@ PHI_ENCRYPTION_KEY=...
 ```
 landtts-platform/
 ├── apps/
-│   ├── web/              # React (Vite) web app
-│   ├── mobile/           # React Native (Expo) mobile app
+│   ├── web/              # React 18 (Vite 5) web app
+│   ├── mobile/           # React Native 0.73.6 (Expo SDK 50) mobile app
 │   ├── docs/             # Nextra documentation site (this site)
 │   └── api/
-│       ├── auth-service/
-│       ├── job-service/
-│       ├── ptf-service/
-│       ├── hr-integration/    # Factorial HR connector
-│       ├── accounting-integration/  # Xero connector
-│       └── ... (19 services)
+│       ├── auth-service/          (port 3001)
+│       ├── job-service/           (port 3002)
+│       ├── ptf-service/           (port 3003)
+│       ├── gps-service/           (port 3004)
+│       ├── messaging-service/     (port 3005)
+│       ├── rota-service/          (port 3006)
+│       ├── employee-service/      (port 3007)
+│       ├── client-service/        (port 3008)
+│       ├── incident-service/      (port 3009)
+│       ├── vehicle-service/       (port 3010)
+│       ├── notification-service/  (port 3011)
+│       ├── billing-service/       (port 3012)
+│       ├── consent-service/       (port 3013)
+│       ├── reporting-service/     (port 3014)
+│       ├── audit-service/         (port 3015)
+│       ├── compliance-service/    (port 3016, Docker-only)
+│       ├── hr-integration/        (port 3017)
+│       └── accounting-integration/ (port 3018)
 ├── packages/
-│   ├── db/               # Prisma schema + client
-│   ├── types/            # Shared TypeScript types
-│   ├── shared/           # Shared utilities (withRetry, etc.)
-│   └── design-system/    # UI component library
-└── docs/                 # LaTeX docs, screenshots, API specs
+│   ├── db/               # Prisma 5.13 schema + migrations + seed (primary + audit)
+│   ├── types/            # Shared TypeScript types and enums
+│   ├── shared/           # ApiClient, CryptoService, RBAC, rate-limiter, retry, error-envelope
+│   └── design-system/    # UI component library (Storybook 8)
+├── infra/
+│   ├── kong/             # Kong declarative config (kong.yml) + certs
+│   ├── keycloak/         # Realm export for import
+│   ├── postgres/         # Init scripts (primary + audit)
+│   ├── k8s/              # Kubernetes manifests (26 files)
+│   ├── caddy/            # Caddyfile for single-EC2
+│   ├── linkerd/          # Service mesh config
+│   └── waf/              # Cloudflare WAF rules
+├── docker-compose.yml    # Local dev infrastructure
+├── turbo.json            # Turborepo pipeline config
+└── package.json          # Root workspace config
 ```
+
+## Docker Compose (Local Development)
+
+```bash
+# Start infrastructure
+docker compose up -d
+
+# Run all services
+npm run dev
+```
+
+Infrastructure services:
+- `postgres-primary` — Primary database (port 5432)
+- `postgres-audit` — Audit database (port 5433)
+- `redis` — Cache + pub/sub (port 6379)
+- `minio` — S3-compatible storage (API: 9000, Console: 9001)
+- `keycloak` — Identity provider (port 8080)
+- `kong` — API Gateway (HTTP: 8000, HTTPS: 8443, Admin: 8001)
+- `compliance-service` — Docker-only service (port 3016)
 
 ## Screenshot Capture Tool
 
-The `ptf-doc-capture.sh` script guides through capturing all 86 platform screenshots:
+The `ptf-doc-capture.sh` script guides through capturing all platform screenshots:
 
 ```bash
 chmod +x docs/ptf-doc-capture.sh && ./docs/ptf-doc-capture.sh
 ```
 
 Screenshots are saved to `docs/images/` and referenced by both the LaTeX documentation
-(`platform-doc.tex`) and this Nextra site.
+and this Nextra site.
 
 <Callout>
-  After capturing screenshots, copy them to `apps/docs//images/` for the Nextra site:
-  `cp docs/images/*.png apps/docs//images/`
+  After capturing screenshots, copy them to `apps/docs/public/images/` for the Nextra site:
+  `cp docs/images/*.png apps/docs/public/images/`
 </Callout>
 
 ## Building the Docs
@@ -78,3 +170,13 @@ cd apps/docs && npm run build && npm run start
 ```
 
 The docs site runs on port 3100 by default.
+
+## Health Checks
+
+All services expose `GET /health` endpoints. The local health-check script tests ports
+3001–3015, 3017, 3018 (excluding compliance-service which is Docker-only).
+
+```bash
+# Check all local services
+./scripts/health-check.sh
+```

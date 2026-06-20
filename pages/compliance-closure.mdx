@@ -25,10 +25,27 @@ is set.
 Closure triggers post-job automation:
 - Automatic invoice generation (if rate card exists for the client)
 - Timesheet period update with worked hours
-- **Factorial HR shift sync** (clock_in / clock_out pushed to Factorial)
+- **Factorial HR shift sync** (clock_in / clock_out pushed to Factorial) or **Deel time tracking sync**
 - Audit trail finalisation
+- `NotificationReceipt` creation for delivery confirmation
 
 ![PTF Closed](/images/48-ptf-closed-status.png)
+
+## Compliance Service (Docker-Only)
+
+The compliance-service (port 3016) runs exclusively in Docker and handles automated compliance tasks:
+
+| Feature | Description |
+|---|---|
+| Breach detection | Automated scanning for data breach indicators |
+| Retention enforcement | Policy-based data lifecycle management |
+| Retention policy | 8-year clinical record minimum retention |
+| Data processor registry | Third-party processor tracking |
+
+<Callout type="info">
+  The compliance-service is not included in local development health checks. It communicates
+  with audit-service (3015) and notification-service (3011) for alerting.
+</Callout>
 
 ## Incident Reporting
 

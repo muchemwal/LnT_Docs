@@ -2,7 +2,32 @@
 
 import { Callout, Steps } from 'nextra/components'
 
-The React Native (Expo) mobile app is the primary interface for crew members during transfers.
+The React Native (Expo SDK 50) mobile app is the primary interface for crew members during transfers.
+It supports **offline-first operation** via WatermelonDB, **biometric authentication**, and
+**intelligent trip assistance**.
+
+## Authentication & Onboarding
+
+- **Keycloak OIDC** with PKCE S256 (`landtts-mobile` client)
+- **Biometric auth**: Face ID / Touch ID / Fingerprint via `react-native-keychain`
+- **Onboarding flow**: First-launch walkthrough for new crew members
+- **Location disclosure**: Google Play compliance screen explaining GPS usage
+
+{/* TODO: Replace placeholders with actual screenshots */}
+![Keycloak Mobile Login](/images/mobile-keycloak-login-placeholder.png)
+![Biometric Auth](/images/mobile-biometric-auth-placeholder.png)
+![Onboarding Flow](/images/mobile-onboarding-placeholder.png)
+![Location Disclosure](/images/mobile-location-disclosure-placeholder.png)
+
+## Role-Based Navigation
+
+| Role | Tab Bar |
+|---|---|
+| Crew Member | Dashboard, Jobs, PTF, Shifts, Messaging, Settings |
+| Dispatcher | LiveMap, Jobs, Messaging, Settings |
+| HR Manager | Rota, Employees, Messaging, Settings |
+| Administrator | Dashboard, Users, Audit, Messaging, Settings |
+| Client | MyJobs, Tracking, Settings |
 
 ## Crew Journey
 
@@ -10,7 +35,8 @@ The React Native (Expo) mobile app is the primary interface for crew members dur
 
 ### Login & Shift Check-In
 
-Crew logs in via Keycloak (`landtts-mobile` client) and checks in with GPS location capture.
+Crew logs in via Keycloak (or biometric unlock) and checks in with GPS location capture.
+Check-in creates a `TimeEntry` record and triggers Factorial/Deel clock-in sync.
 
 ![Mobile Login](/images/30-mobile-login.png)
 ![Shift Check-In](/images/33-mobile-shift-checkin.png)
@@ -51,12 +77,11 @@ Crew records journey log entries during transport:
 
 | Log Type | Purpose |
 |---|---|
+| `pickup_event` | Pickup-related observations |
 | `journey_update` | General progress / route notes |
-| `patient_assessment` | Clinical observation during transit |
 | `restraint_event` | Restraint used (type, duration, justification) |
-| `food_given` | Food/drink provided to patient |
-| `behaviour_note` | Behaviour observation |
-| `incident` | Any incident during transport |
+| `delay_event` | Delay with reason |
+| `clinical_event` | Clinical observation during transit |
 
 All notes are encrypted (AES-256) and tagged with GPS coordinates.
 
@@ -70,12 +95,136 @@ Transitions to `arrived_destination`. Triggers clinical handover workflow.
 
 </Steps>
 
+## Trip Intelligence Service
+
+The mobile app includes a `TripIntelligenceService` providing smart contextual prompts:
+
+| Feature | Description |
+|---|---|
+| Geofence detection | Auto-prompts status change when crew enters pickup/destination geofence |
+| Stationary detection | Alerts if vehicle stationary for extended period during active transit |
+| WTR break reminders | Prompts mandatory rest breaks per Working Time Regulations |
+| Patient check intervals | Periodic reminders to log patient welfare observations |
+| Smart status prompts | Context-aware suggestions for the next logical status transition |
+
+{/* TODO: Screenshot placeholder */}
+![Trip Intelligence Prompt](/images/mobile-trip-intelligence-placeholder.png)
+
+## Shift Intelligence Service
+
+| Feature | Description |
+|---|---|
+| Shift start warnings | Alert when approaching shift start time |
+| Shift end warnings | Alert when approaching contracted end time |
+| Overtime alerts | Notify when entering overtime territory |
+| Auto-checkout | Automatic shift end if no activity detected beyond threshold |
+
+{/* TODO: Screenshot placeholder */}
+![Shift Intelligence Alert](/images/mobile-shift-intelligence-placeholder.png)
+
 ## GPS Tracking
 
-- Location updates every 10 seconds during active transport
+- Location updates every 10 seconds during active transport (native WebSocket via `ws`)
 - Each update: latitude, longitude, accuracy (m), heading (°), speed (km/h), device ID
-- Offline buffering: locations stored locally and uploaded on reconnection (flagged `is_buffered`)
+- **Offline buffering**: locations stored locally via WatermelonDB and uploaded on reconnection (flagged `is_buffered`)
 - History: `GET /v1/gps/jobs/:job_id/history`
 - Current: `GET /v1/gps/jobs/:job_id/current`
 
 ![GPS Tracking](/images/39-mobile-gps-tracking.png)
+
+## Trip Share (Live Tracking Links)
+
+Crew or dispatchers can generate **public live tracking links** (similar to Uber/Bolt):
+- `POST /v1/jobs/:id/share` generates a 24-hour token
+- Public page at `/track/:token` shows real-time position on map
+- No authentication required for viewers
+- Automatically expires after 24 hours or on job completion
+
+{/* TODO: Screenshot placeholder */}
+![Trip Share Link](/images/mobile-trip-share-placeholder.png)
+
+## Offline Sync (WatermelonDB)
+
+The mobile app operates **offline-first** with automatic synchronisation:
+
+| Component | Purpose |
+|---|---|
+| `SyncEngine` | Manages bidirectional sync between local DB and server |
+| Schema | WatermelonDB schema mirroring key server models |
+| Models | Local model definitions with sync adapters |
+| Reconnection | Automatic push of buffered data when connectivity returns |
+
+<Callout type="info">
+  GPS locations, journey logs, and status transitions captured offline are queued locally
+  and pushed to the server on reconnection. The server reconciles timestamps to maintain
+  accurate audit trails.
+</Callout>
+
+## Vehicle Inspection (Mobile)
+
+Crew can complete pre-journey vehicle inspections directly from the mobile app:
+- Checklist-based inspection form
+- Photo capture for defects
+- Pass/fail per item with notes
+- Auto-flags vehicle as non-compliant if critical items fail
+
+{/* TODO: Screenshot placeholder */}
+![Vehicle Inspection Mobile](/images/mobile-vehicle-inspection-placeholder.png)
+
+## Crew Dashboard
+
+The crew dashboard (home screen) shows:
+- Current shift status and next scheduled shift
+- Assigned jobs for today with priority indicators
+- Quick actions (check-in, view job, start navigation)
+- Notifications badge count
+
+{/* TODO: Screenshot placeholder */}
+![Crew Dashboard](/images/mobile-crew-dashboard-placeholder.png)
+
+## Incident Reporting (Mobile)
+
+Crew can file incident reports directly from the mobile app during or after a transfer:
+- Incident type selection (patient_fall, near_miss, vehicle_issue, clinical_concern, other)
+- Severity classification (standard, serious_adverse_event)
+- Location auto-captured via GPS
+- Description and immediate actions (encrypted at rest)
+- Photo attachment capability
+
+{/* TODO: Screenshot placeholder */}
+![Mobile Incident Report](/images/mobile-incident-report-placeholder.png)
+
+## Patient Consent Capture
+
+For transfers requiring explicit patient consent:
+- Consent type selection (data_processing, data_sharing)
+- Representative details if patient cannot consent directly
+- Lawful basis selection when consent is not given
+- Digital signature capture on device
+
+{/* TODO: Screenshot placeholder */}
+![Mobile Consent Capture](/images/mobile-consent-capture-placeholder.png)
+
+## Absence Request
+
+Crew can request leave directly from the mobile app:
+- Absence type (sick, annual_leave, other)
+- Date range selection
+- Reason field
+- Syncs to Factorial/Deel on submission
+- Status tracking (pending, approved, rejected)
+
+{/* TODO: Screenshot placeholder */}
+![Mobile Absence Request](/images/mobile-absence-request-placeholder.png)
+
+## Encrypted Messaging
+
+Secure crew-to-dispatch communication:
+- End-to-end encrypted conversations (one-to-one and group)
+- PHI detection warns before sending sensitive data
+- File and image attachments (20 MB limit)
+- Read/delivered receipts
+- Push notification for new messages
+
+{/* TODO: Screenshot placeholder */}
+![Mobile Messaging](/images/mobile-messaging-placeholder.png)

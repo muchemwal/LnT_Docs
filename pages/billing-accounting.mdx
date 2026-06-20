@@ -4,11 +4,11 @@ import { Callout } from 'nextra/components'
 
 ## Billing Workflow
 
-1. Job completion triggers `job-completion-consumer` → auto-generates draft invoice
+1. Job completion triggers auto-generation of a draft invoice
 2. Invoice line items calculated from client's rate card
 3. Administrator reviews and approves
-4. PDF generated and stored to S3
-5. Approved invoice synced to Xero
+4. PDF generated and stored to MinIO (S3-compatible)
+5. Approved invoice synced to Xero via accounting-integration (port 3018)
 6. Payment status tracked via Xero polling
 
 ![Invoice Generated](/images/49-invoice-auto-generated.png)
@@ -22,7 +22,20 @@ import { Callout } from 'nextra/components'
 | `client_id` | Linked client organisation |
 | `job_id` | Originating transfer job |
 | `line_items` | Array of `{description, amount, vat_rate}` |
+| `subtotal` | Sum of line item amounts |
+| `vat_amount` | Calculated VAT |
+| `total_amount` | Subtotal + VAT |
 | `status` | `draft → approved → synced → paid` (or `failed`/`overdue`) |
+| `due_date` | Payment due date |
+| `pdf_s3_key` | S3/MinIO key for generated PDF |
+
+## Invoice Status Machine
+
+```
+draft → approved → synced → paid
+                 ↘ failed
+                 ↘ overdue
+```
 
 ## Rate Cards
 
@@ -31,24 +44,56 @@ Rate cards define billing per client:
 - `rates`: JSON with rates per priority (routine, urgent, emergency)
 - `effective_from` / `effective_to`: date range validity
 
-## Xero Integration
+Each priority level can have independent `flat`, `per_mile`, and `per_hour` rates.
+
+## Xero Integration (accounting-integration, port 3018)
+
+The accounting-integration service manages Xero OAuth 2.0 tokens via `xero-token-manager.ts`
+and syncs data via `xero-connector.ts`.
 
 | Endpoint | Purpose |
 |---|---|
 | `POST /v1/accounting/sync/invoice` | Push approved invoice to Xero |
 | `POST /v1/accounting/sync/contact` | Sync client as Xero contact |
 | `GET /v1/accounting/payment-status/:ref` | Check payment status |
-| `GET /v1/accounting/oauth/callback` | OAuth callback |
+| `GET /v1/accounting/oauth/callback` | OAuth 2.0 callback |
+| `GET /v1/integration/health` | Integration health dashboard |
 
 ![Xero Sync](/images/51-xero-sync-status.png)
 
-## Timesheet → Factorial → Payroll
+## Timesheet → HR Provider → Payroll
 
-When a PTF closes, the shift check-in/out data flows to Factorial HR for payroll:
+When a PTF closes, the shift check-in/out data flows to the configured HR provider for payroll:
 
 ```
-PTF Closed → Timesheet Generated → HR Approval → Factorial Shift Sync → Payroll
+PTF Closed → Timesheet Generated → HR Approval → Factorial/Deel Shift Sync → Payroll
 ```
 
 ![Timesheet Generated](/images/52-timesheet-generated.png)
 ![Timesheet Approved](/images/53-timesheet-approved.png)
+
+## Timesheet Approval Page
+
+The `/timesheets` page (administrator, hr_manager) provides:
+- List of timesheet periods with status filters (pending, approved, rejected, synced)
+- Aggregated KPIs: scheduled vs worked minutes, overtime, break time
+- Bulk approve/reject actions
+- One-click sync to Factorial/Deel after approval
+
+{/* TODO: Screenshot placeholder */}
+![Timesheet Approval](/images/timesheet-approval-placeholder.png)
+
+## Multi-Leg Journey Billing
+
+For multi-leg journeys, each leg can generate separate billing:
+- Accommodation costs tracked via `JobAccommodation`
+- Meal expenses via `JobMeal`
+- Additional expenses (fuel, tolls, parking) via `JobExpense`
+- All expenses rolled into the invoice line items
+
+## Client Portal Billing View
+
+Clients accessing `/bookings` can view:
+- Invoice history for their organisation
+- Payment status per invoice
+- Download approved PDFs

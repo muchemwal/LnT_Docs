@@ -1,22 +1,53 @@
-# Factorial HR Integration
+# Factorial HR & Deel Integration
 
 import { Callout, Tabs, Tab, Steps } from 'nextra/components'
 
 The platform integrates with [Factorial HR](https://apidoc.factorialhr.com/reference) via the
-**2026-01-01 API version** for employee management, attendance tracking, shift synchronisation,
-absence management, and timesheet approvals.
+**2026-01-01 API version** and with [Deel](https://developer.deel.com/) via the **REST v2 API**
+for employee management, attendance tracking, shift synchronisation, absence management, and
+timesheet approvals.
 
 <Callout type="info">
-  Service: `hr-integration` (port 3017). Connector: `FactorialConnector` implementing `HRPort` interface.
+  Service: `hr-integration` (port 3017). Connectors: `FactorialConnector` and `DeelConnector`,
+  both implementing the `HRPort` interface from `@landtts/shared`.
 </Callout>
 
-## API Base URL
+## Architecture
+
+The hr-integration service uses a **port/adapter pattern** allowing interchangeable HR providers:
+
+```
+┌─────────────────────────────────────────────────────┐
+│  hr-integration service (port 3017)                  │
+│                                                     │
+│  ┌─────────────┐    ┌──────────────────────────┐   │
+│  │   HRPort    │◄───│  FactorialConnector      │   │
+│  │  interface  │    │  (2026-01-01 API)        │   │
+│  │             │    └──────────────────────────┘   │
+│  │             │                                   │
+│  │             │    ┌──────────────────────────┐   │
+│  │             │◄───│  DeelConnector           │   │
+│  │             │    │  (REST v2 API)           │   │
+│  └─────────────┘    └──────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+```
+
+## Factorial HR — API Base URL
 
 ```
 https://api.factorialhr.com/api/2026-01-01
 ```
 
+## Deel — API Base URL
+
+```
+https://api.letsdeel.com/rest/v2
+```
+
 ## Authentication
+
+<Tabs items={['Factorial (OAuth 2.0)', 'Deel (Bearer Token)']}>
+  <Tab>
 
 Factorial uses **OAuth 2.0** with access/refresh tokens.
 
@@ -60,7 +91,21 @@ curl -X POST 'https://api.factorialhr.com/oauth/token' \
 
 </Steps>
 
-## Attendance Shifts API
+  </Tab>
+  <Tab>
+
+Deel uses a **Bearer API token** with no OAuth flow required.
+
+```bash
+curl -X GET 'https://api.letsdeel.com/rest/v2/workers' \
+  -H 'Authorization: Bearer <DEEL_API_TOKEN>' \
+  -H 'Content-Type: application/json'
+```
+
+  </Tab>
+</Tabs>
+
+## Factorial — Attendance Shifts API
 
 The core integration point for crew timesheets. Maps directly to the mobile app's shift check-in/out.
 
@@ -125,34 +170,75 @@ POST /api/2026-01-01/resources/attendance/shifts/break_start
 POST /api/2026-01-01/resources/attendance/shifts/break_end
 ```
 
-## Platform ↔ Factorial Data Flow
+## Deel — Workers & Time Tracking API
+
+### Sync Employee (Worker)
+
+```
+POST /rest/v2/workers
+```
+
+Payload:
+```json
+{
+  "first_name": "John",
+  "last_name": "Smith",
+  "job_title": "Crew Member",
+  "start_date": "2026-01-15",
+  "weekly_hours": 37.5,
+  "external_id": "uuid-from-platform"
+}
+```
+
+### Sync Shifts (Time Tracking)
+
+```
+POST /rest/v2/time-tracking
+```
+
+Payload per shift:
+```json
+{
+  "worker_id": "deel-worker-id",
+  "start_time": "2026-03-17T08:00:00Z",
+  "end_time": "2026-03-17T17:00:00Z",
+  "description": "Patient transport shift",
+  "external_id": "shift-uuid"
+}
+```
+
+### Sync Absence (Time Off)
+
+```
+POST /rest/v2/time-off
+```
+
+## Platform ↔ HR Provider Data Flow
 
 ```
 ┌─────────────────────┐     ┌──────────────────────┐     ┌─────────────────────┐
-│   Mobile App         │     │   LANDTTS Platform    │     │   Factorial HR       │
-│   (Crew Member)      │     │   (hr-integration)    │     │   (2026-01-01 API)   │
+│   Mobile App         │     │   LANDTTS Platform    │     │  Factorial / Deel    │
+│   (Crew Member)      │     │   (hr-integration)    │     │                     │
 ├─────────────────────┤     ├──────────────────────┤     ├─────────────────────┤
 │                     │     │                      │     │                     │
-│ Shift Check-In ─────┼────▶│ POST /v1/hr/         │────▶│ POST /attendance/   │
-│ (GPS + timestamp)   │     │   sync/shifts        │     │   shifts/clock_in   │
+│ Shift Check-In ─────┼────▶│ POST /v1/hr/         │────▶│ clock_in / workers  │
+│ (GPS + timestamp)   │     │   sync/shifts        │     │                     │
 │                     │     │                      │     │                     │
-│ Break Start ────────┼────▶│ (break tracking)     │────▶│ POST /attendance/   │
-│                     │     │                      │     │   shifts/break_start│
+│ Break Start ────────┼────▶│ (break tracking)     │────▶│ break_start / n/a   │
 │                     │     │                      │     │                     │
-│ Break End ──────────┼────▶│ (break tracking)     │────▶│ POST /attendance/   │
-│                     │     │                      │     │   shifts/break_end  │
+│ Break End ──────────┼────▶│ (break tracking)     │────▶│ break_end / n/a     │
 │                     │     │                      │     │                     │
-│ Shift Check-Out ────┼────▶│ POST /v1/hr/         │────▶│ POST /attendance/   │
-│ (GPS + timestamp)   │     │   sync/shifts        │     │   shifts/clock_out  │
+│ Shift Check-Out ────┼────▶│ POST /v1/hr/         │────▶│ clock_out / time-   │
+│ (GPS + timestamp)   │     │   sync/shifts        │     │   tracking          │
 │                     │     │                      │     │                     │
-│ Job Completed ──────┼────▶│ (auto-timesheet)     │────▶│ POST /attendance/   │
-│ (PTF closed)        │     │                      │     │   shifts            │
+│ Job Completed ──────┼────▶│ (auto-timesheet)     │────▶│ shifts / time-      │
+│ (PTF closed)        │     │                      │     │   tracking          │
 │                     │     │                      │     │                     │
-│ Absence Request ────┼────▶│ POST /v1/hr/         │────▶│ POST /timeoff/      │
-│                     │     │   sync/absence       │     │   leaves            │
+│ Absence Request ────┼────▶│ POST /v1/hr/         │────▶│ timeoff/leaves /    │
+│                     │     │   sync/absence       │     │   time-off          │
 │                     │     │                      │     │                     │
-│ HR Approval ────────┼────▶│ (timesheet approve)  │────▶│ POST /attendance/   │
-│ (web dashboard)     │     │                      │     │   reviews/bulk_create│
+│ HR Approval ────────┼────▶│ (timesheet approve)  │────▶│ reviews/bulk_create │
+│ (web dashboard)     │     │                      │     │   / payroll         │
 └─────────────────────┘     └──────────────────────┘     └─────────────────────┘
 ```
 
@@ -160,33 +246,32 @@ POST /api/2026-01-01/resources/attendance/shifts/break_end
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/v1/hr/sync/employee` | Sync employee record to Factorial |
+| `POST` | `/v1/hr/sync/employee` | Sync employee record to Factorial/Deel |
 | `POST` | `/v1/hr/sync/shifts` | Sync shift data (clock in/out) |
 | `POST` | `/v1/hr/sync/absence` | Sync absence records |
 | `POST` | `/v1/hr/export/worked-hours` | Export worked hours for pay period |
-| `POST` | `/v1/hr/sync/clock-in` | Real-time clock-in via Factorial |
-| `POST` | `/v1/hr/sync/clock-out` | Real-time clock-out via Factorial |
+| `POST` | `/v1/hr/sync/clock-in` | Real-time clock-in |
+| `POST` | `/v1/hr/sync/clock-out` | Real-time clock-out |
 | `POST` | `/v1/hr/sync/break-start` | Sync break start |
 | `POST` | `/v1/hr/sync/break-end` | Sync break end |
-| `GET` | `/v1/hr/shifts` | Read shifts from Factorial |
+| `GET` | `/v1/hr/shifts` | Read shifts from HR provider |
 | `GET` | `/v1/integration/health` | Integration health status |
 
-## Mobile App Actions → Factorial Mapping
+## Mobile App Actions → HR Provider Mapping
 
-| Mobile Action | Platform Event | Factorial API Call |
-|---|---|---|
-| Crew taps "Check In" | Shift record created | `POST /attendance/shifts/clock_in` |
-| Crew taps "Start Break" | Break start logged | `POST /attendance/shifts/break_start` |
-| Crew taps "End Break" | Break end logged | `POST /attendance/shifts/break_end` |
-| Crew taps "Check Out" | Shift completed | `POST /attendance/shifts/clock_out` |
-| PTF reaches `closed` | Auto-timesheet generated | `POST /attendance/shifts` (full shift record) |
-| HR approves timesheet | Timesheet approved | `POST /attendance/reviews/bulk_create` |
-| Crew requests absence | Absence record created | `POST /timeoff/leaves` |
-| HR approves absence | Leave approved | `POST /timeoff/leaves/approve` |
+| Mobile Action | Platform Event | Factorial API Call | Deel API Call |
+|---|---|---|---|
+| Crew taps "Check In" | Shift record created | `POST /attendance/shifts/clock_in` | `POST /rest/v2/time-tracking` |
+| Crew taps "Start Break" | Break start logged | `POST /attendance/shifts/break_start` | N/A (included in shift) |
+| Crew taps "End Break" | Break end logged | `POST /attendance/shifts/break_end` | N/A |
+| Crew taps "Check Out" | Shift completed | `POST /attendance/shifts/clock_out` | `PATCH /rest/v2/time-tracking/:id` |
+| PTF reaches `closed` | Auto-timesheet generated | `POST /attendance/shifts` | `POST /rest/v2/time-tracking` |
+| HR approves timesheet | Timesheet approved | `POST /attendance/reviews/bulk_create` | `POST /rest/v2/payroll` |
+| Crew requests absence | Absence record created | `POST /timeoff/leaves` | `POST /rest/v2/time-off` |
 
 ## Connector Implementation
 
-<Tabs items={['Push Shift', 'Clock In', 'Read Shifts']}>
+<Tabs items={['Factorial: Push Shift', 'Deel: Sync Employee', 'Factorial: Clock In']}>
   <Tab>
 ```typescript
 // POST /api/2026-01-01/resources/attendance/shifts
@@ -212,6 +297,33 @@ async syncShifts(shifts: HRShift[]): Promise<SyncResult> {
   </Tab>
   <Tab>
 ```typescript
+// POST /rest/v2/workers
+async syncEmployee(employee: HREmployee): Promise<SyncResult> {
+  return withRetry(async () => {
+    const payload = {
+      first_name: employee.full_name.split(' ')[0] ?? '',
+      last_name: employee.full_name.split(' ').slice(1).join(' ') ?? '',
+      job_title: employee.role,
+      start_date: employee.employment_start_date,
+      weekly_hours: employee.contracted_hours_per_week,
+      external_id: employee.id,
+    };
+    const response = await axios.post(
+      `${DEEL_API_BASE}/workers`,
+      payload,
+      { headers: this.headers },
+    );
+    return {
+      success: true,
+      externalId: response.data.data.id,
+      syncedAt: new Date().toISOString(),
+    };
+  });
+}
+```
+  </Tab>
+  <Tab>
+```typescript
 // POST /api/2026-01-01/resources/attendance/shifts/clock_in
 async clockIn(employeeId: number, now: string): Promise<SyncResult> {
   return withRetry(async () => {
@@ -222,22 +334,6 @@ async clockIn(employeeId: number, now: string): Promise<SyncResult> {
     );
     return { success: true, syncedAt: new Date().toISOString() };
   });
-}
-```
-  </Tab>
-  <Tab>
-```typescript
-// GET /api/2026-01-01/resources/attendance/shifts
-async getShifts(params: {
-  employee_ids?: number[];
-  start_on?: string;
-  end_on?: string;
-}): Promise<FactorialShift[]> {
-  const response = await axios.get(
-    `${FACTORIAL_API_BASE}/resources/attendance/shifts`,
-    { headers: this.headers, params },
-  );
-  return response.data.data;
 }
 ```
   </Tab>
@@ -254,7 +350,7 @@ async getShifts(params: {
 | `GET /timeoff/leave-types` | Available leave types |
 | `GET /timeoff/allowance-stats` | Remaining allowance per employee |
 
-## Webhook Support
+## Webhook Support (Factorial)
 
 Factorial supports webhooks for real-time event notifications. Relevant events:
 
@@ -293,3 +389,10 @@ Configure via `POST /api/2026-01-01/resources/api-public/webhook-subscriptions`.
 | `FACTORIAL_CLIENT_ID` | OAuth application ID |
 | `FACTORIAL_CLIENT_SECRET` | OAuth application secret |
 | `FACTORIAL_WEBHOOK_SECRET` | Webhook signature verification secret |
+| `DEEL_API_TOKEN` | Deel REST API bearer token |
+
+## Retry Logic
+
+Both connectors implement `withRetry` from `@landtts/shared`:
+- Up to 3 retries with exponential backoff (1s, 2s, 4s)
+- On final failure: emits HR Manager notification via notification-service

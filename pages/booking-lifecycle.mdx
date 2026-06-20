@@ -39,6 +39,7 @@ Pickup and destination addresses with postcodes. Mileage is auto-calculated via 
 
 - Return leg checkbox reverses addresses and doubles mileage
 - Transfer datetime, priority (routine/urgent/emergency), mode of arrival
+- **Multi-leg journeys**: add transport legs with segment types (pickup, travel, wait_at_facility, appointment, fuel_stop, meal_stop, rest_stop, accommodation, shift_change, return_transport, destination_handover)
 
 ![Mileage Calculated](/images/15-step3-mileage-calculated.png)
 ![Return Leg](/images/16-step3-return-leg.png)
@@ -56,12 +57,15 @@ All clinical notes are stored with **AES-256 encryption** at rest.
 Risk checklist with toggle switches: violence, self-harm, absconding, substance misuse.
 Each risk can have accompanying notes.
 
+**Safeguarding concerns** are recorded separately via `PTFSafeguarding` when applicable.
+
 ![Risk Assessment](/images/19-step5-risk-checklist.png)
 
 ### Step 6 — Crew & Escort
 
 - Internal users: crew dropdown, vehicle dropdown, escort options
 - External users: free-form crew name textarea
+- **Multi-crew assignment**: assign multiple crew members with roles (driver, medic, escort, supervisor, relief_driver) and duty status
 
 ![Crew Internal](/images/20-step6-crew-internal.png)
 
@@ -86,6 +90,66 @@ Each transition:
 - Sets a corresponding timestamp (e.g. `crew_assigned_at`, `pickup_arrival_at`)
 - Creates a `WorkflowEvent` audit record
 - Triggers push notifications (job reference only, never patient data)
+
+## Job Status (Transfer Job)
+
+The `TransferJob` has its own status machine:
+
+```
+pending → accepted → en_route → on_scene → at_pickup → patient_loaded
+→ in_transit → at_destination → completed (or cancelled)
+```
+
+| Status | Description |
+|---|---|
+| `pending` | Job created, awaiting crew assignment |
+| `accepted` | Crew accepted the job |
+| `en_route` | Crew en route to pickup |
+| `on_scene` | Crew arrived in area |
+| `at_pickup` | Crew at pickup location |
+| `patient_loaded` | Patient loaded into vehicle |
+| `in_transit` | Active transit to destination |
+| `at_destination` | Arrived at destination |
+| `completed` | Job successfully completed |
+| `cancelled` | Job cancelled |
+
+## Multi-Leg Journey Support
+
+For long-distance or complex transfers, jobs can have multiple transport legs and segments:
+
+| Model | Purpose |
+|---|---|
+| `JobTransportLeg` | A single leg of a multi-leg journey (e.g. Hospital A → Hotel → Hospital B) |
+| `JobSegment` | Granular segment within a leg (pickup, travel, wait, appointment, etc.) |
+| `JobAccommodation` | Accommodation records for overnight stays |
+| `JobMeal` | Meal records during long journeys |
+| `JobExpense` | Expense tracking (fuel, parking, tolls, etc.) |
+
+### Segment Types
+
+| Type | Description |
+|---|---|
+| `pickup` | Collecting patient at origin |
+| `travel` | Active driving segment |
+| `wait_at_facility` | Waiting at a medical facility |
+| `appointment` | Patient attending an appointment |
+| `fuel_stop` | Refuelling stop |
+| `meal_stop` | Meal break |
+| `rest_stop` | WTR-mandated rest break |
+| `accommodation` | Overnight stay |
+| `shift_change` | Crew changeover point |
+| `return_transport` | Return journey |
+| `destination_handover` | Handover at final destination |
+
+## Multi-Crew Assignments
+
+Complex transfers support multiple crew members via `JobCrewAssignment`:
+
+| Field | Description |
+|---|---|
+| `crew_role` | `driver`, `medic`, `escort`, `supervisor`, `relief_driver` |
+| `duty_status` | `active_transport`, `standby_waiting`, `off_duty_rest`, `accommodation_rest` |
+| `is_lead` | Boolean — primary responsible crew member |
 
 ## Return Journey Logic
 
