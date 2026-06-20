@@ -5,9 +5,21 @@ import { Callout } from 'nextra/components'
 ## Dispatch Board
 
 The dispatch board provides a real-time pipeline view with columns: **pending → accepted → en_route
-→ on_scene → patient_loaded → completed**. Updates arrive via WebSocket within seconds of crew actions.
+→ on_scene → at_pickup → patient_loaded → in_transit → at_destination → completed**. Updates arrive via WebSocket within seconds of crew actions.
 
 ![Dispatch Board](/images/25-dispatch-board-pipeline.png)
+
+## Kong API Gateway
+
+All dispatch traffic routes through **Kong 3.7** (DB-less declarative config):
+
+| Feature | Configuration |
+|---|---|
+| Rate limiting | 100 requests/minute per consumer |
+| CORS | Configured for web + mobile origins |
+| IP restriction | Admin/audit routes restricted |
+| Request size | Configurable limits per route |
+| SSL | TLS termination on port 8443 |
 
 ## Crew Assignment
 
@@ -15,6 +27,7 @@ Assignment is performed through a modal with:
 - Crew member dropdown (filtered to active, compliant crew)
 - Vehicle dropdown (filtered to compliant vehicles)
 - Compliance check indicators (DBS status, certifications, MOT/insurance)
+- **Multi-crew support**: assign multiple crew with roles (driver, medic, escort, supervisor, relief_driver)
 
 ![Crew Assignment](/images/27-crew-assignment-modal.png)
 
@@ -23,15 +36,16 @@ Assignment is performed through a modal with:
   `COMPLIANCE_VIOLATION` error.
 </Callout>
 
-On successful assignment, the crew receives a push notification within 5 seconds. An unaccepted job
-triggers a dispatcher alert after 10 minutes via Redis tracking.
+On successful assignment, the crew receives a push notification within 5 seconds (via APNs/FCM).
+An unaccepted job triggers a dispatcher alert after 10 minutes via Redis tracking.
 
 ## Real-Time Monitoring
 
-- Live GPS map with crew positions (10-second updates)
+- Live GPS map with crew positions (10-second updates via native WebSocket)
 - Status timeline with all transitions and timestamps
 - Journey log entries from crew (clinical events, delays, restraint)
 - WebSocket-driven dispatch board updates
+- **Trip share links** — public 24-hour tracking URLs (like Uber/Bolt live tracking)
 
 ![Live Tracking](/images/29-live-tracking-map.png)
 
@@ -39,13 +53,36 @@ triggers a dispatcher alert after 10 minutes via Redis tracking.
 
 | Channel | Mechanism | PHI Policy |
 |---|---|---|
-| Push | Mobile device delivery | Job reference only, never patient data |
+| Push (iOS) | APNs | Job reference only, never patient data |
+| Push (Android) | FCM | Job reference only, never patient data |
+| SMS | Twilio | Job reference only |
 | In-app | SSE stream at `GET /v1/notifications/stream` | Scoped to user role |
-| Categories | `job_alert`, `rota_change`, `cert_expiry`, `system_alert`, `message`, `incident_alert`, `billing` | — |
+| Email | SMTP | Non-PHI summaries only |
 
-Key automated notifications:
-- Crew assigned → crew notified
+### Notification Categories
+
+`job_alert`, `rota_change`, `cert_expiry`, `system_alert`, `message`, `incident_alert`, `billing`
+
+### Notification Receipts
+
+Each notification has a `NotificationReceipt` tracking delivery status across channels.
+
+### Key Automated Notifications
+
+- Crew assigned → crew notified (push + in-app)
 - Crew en route / arrived / departed → dispatcher notified
 - Handover completed → both parties notified
 - Unaccepted job after 10 min → dispatcher alerted
 - Certification expiring → employee + HR notified
+- Invoice overdue → administrator alerted
+
+## Service Manager
+
+The `/services` page (administrator only) provides operational visibility into all 18 microservices:
+- Health status per service
+- Last response time
+- Error rate monitoring
+- Service restart controls
+
+{/* TODO: Screenshot placeholder */}
+![Service Manager](/images/service-manager-placeholder.png)

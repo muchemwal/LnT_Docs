@@ -6,12 +6,12 @@ import { Callout } from 'nextra/components'
 
 | Standard | Implementation |
 |---|---|
-| 1 — Personal data safeguards | AES-256 encryption, RBAC |
+| 1 — Personal data safeguards | AES-256 encryption, RBAC, Kong rate limiting |
 | 2 — Staff responsibilities | Role-based training via certifications |
 | 3 — Need-to-know access | RBAC with data scoping per role |
 | 7 — Lawful data sharing | Consent records with lawful basis |
-| 8 — Breach response | Incident reporting, breach detection |
-| 9 — Cyber threat protection | MFA, account lockout, encrypted storage |
+| 8 — Breach response | Incident reporting, breach detection (compliance-service) |
+| 9 — Cyber threat protection | MFA (TOTP), account lockout, encrypted storage, WAF |
 | 10 — Supplier accountability | Data processor registry |
 
 ## UK GDPR
@@ -26,17 +26,58 @@ import { Callout } from 'nextra/components'
 
 - Clinical records (PTFs): minimum **8-year** retention
 - Soft delete via `deleted_at` — hard delete blocked until retention expires
-- `retention-enforcer` module enforces policies
-- Audit records retained indefinitely (immutable)
+- `compliance-service` (Docker-only, port 3016) enforces retention policies automatically
+- Audit records retained indefinitely (immutable, separate database)
+
+## Compliance Service (Port 3016)
+
+The compliance-service runs in Docker and handles:
+
+| Feature | Description |
+|---|---|
+| Breach detection | Automated scanning for data breach indicators |
+| Retention enforcement | Policy-based lifecycle management for clinical records |
+| DSAR processing | Data Subject Access Request fulfilment |
+| Right to erasure | Erasure workflow with retention policy checks |
+| Data processor registry | Third-party processor tracking and accountability |
+
+<Callout type="info">
+  The compliance-service communicates with audit-service (3015) for evidence and
+  notification-service (3011) for alerting DPO and administrators.
+</Callout>
 
 ## DPO Reporting
 
 `GET /v1/reports/dpo` generates monthly reports:
 - PHI volume, DSAR count, breach events, consent statistics
 
+{/* TODO: Screenshot placeholder */}
 ![DPO Report](/images/72-dpo-monthly-report.png)
 
 ## Consent Management
 
+Consent records capture:
+- `consent_type`: `data_processing`, `data_sharing`
+- `consented`: boolean
+- `lawful_basis`: required when consent is not given (vital_interests, legitimate_task)
+- `representative_name` / `representative_reason`: when patient cannot consent directly
+- `withdrawn_at`: timestamp when consent is withdrawn (triggers erasure evaluation)
+
+{/* TODO: Screenshot placeholders */}
 ![Consent Capture](/images/74-consent-capture.png)
 ![Consent Withdrawal](/images/75-consent-withdrawal.png)
+
+## Organisation Settings
+
+Dynamic compliance configuration via `OrgSetting` model:
+- Settings stored in database with environment variable fallback
+- Grouped by category (security, notifications, compliance, billing, etc.)
+- Admin-only bulk upsert via `PUT /v1/settings`
+- Read by `org-settings` config reader in `@landtts/shared`
+
+## User Preferences
+
+Per-user settings via `UserPreference` model:
+- Notification preferences (channels, categories)
+- Display preferences (theme, density)
+- Shift preferences (default role, availability)

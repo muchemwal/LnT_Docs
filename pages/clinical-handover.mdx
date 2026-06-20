@@ -5,13 +5,30 @@ import { Callout } from 'nextra/components'
 ## Handover Process
 
 1. Crew enters handover notes (clinical observations, patient condition) — stored encrypted
-2. Crew captures their own digital signature
-3. Receiving party captures their signature with role selection
-4. Both signatures verified → PTF transitions to `handover_completed`
+2. Crew completes the **handover checklist** (`PTFHandoverChecklist`)
+3. Crew captures their own digital signature
+4. Receiving party captures their signature with role selection
+5. Both signatures verified → PTF transitions to `handover_completed`
 
 ![Handover Notes](/images/41-handover-notes-entry.png)
 ![Crew Signature](/images/42-crew-signature-capture.png)
 ![Receiver Signature](/images/43-receiver-signature-capture.png)
+
+## Handover Checklist
+
+The `PTFHandoverChecklist` model provides structured handover documentation:
+
+| Field | Description |
+|---|---|
+| Patient condition | Current clinical status at handover |
+| Medications given | Any medications administered during transport |
+| Observations | Clinical observations during journey |
+| Equipment returned | Confirmation all equipment accounted for |
+| Patient belongings | Confirmation patient belongings handed over |
+| Notes | Free-text additional handover information |
+
+{/* TODO: Screenshot placeholder */}
+![Handover Checklist](/images/handover-checklist-placeholder.png)
 
 ## Signature Evidence
 
@@ -19,9 +36,9 @@ Each `PTFSignature` record includes:
 
 | Field | Description |
 |---|---|
-| `signature_type` | `booking_referrer`, `pickup_handover_staff`, `patient_consent`, `receiving_staff`, `crew_declaration`, etc. |
+| `signature_type` | `booking_referrer`, `pickup_handover_staff`, `patient_consent`, `temporary_facility_handover`, `return_handover`, `receiving_staff`, `crew_declaration`, `document_verification` |
 | `signer_role` | Role of the person signing |
-| `signature_url` | S3 key for the signature image |
+| `signature_url` | S3 key for the signature image (MinIO) |
 | `latitude` / `longitude` | GPS coordinates at time of signing |
 | `device_id` | Device identifier |
 | `signed_at` | Timestamp |
@@ -39,6 +56,23 @@ Each `PTFSignature` record includes:
 `PatientCustodyEvent` records track custody changes:
 - `crew_in_custody`, `facility_in_custody`, `police_in_custody`, `escort_in_custody`, `returned_to_crew`
 - Each event records: handed_over_by, received_by_name, received_by_role, signature reference, location
+
+## Safeguarding
+
+The `PTFSafeguarding` model captures safeguarding concerns identified during transport:
+
+| Field | Description |
+|---|---|
+| Concern type | Category of safeguarding concern |
+| Description | Detailed encrypted description |
+| Action taken | Immediate actions performed |
+| Reported to | Authority/person notified |
+| Recorded by | Crew member who identified the concern |
+
+<Callout type="warning">
+  Safeguarding records are immutable once created and trigger immediate notification to
+  the designated safeguarding lead.
+</Callout>
 
 ## Mental Health Act Sections
 

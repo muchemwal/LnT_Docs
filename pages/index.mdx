@@ -3,7 +3,7 @@
 import { Callout, Cards, Card } from 'nextra/components'
 
 <Callout type="info">
-  Version 2.0 — Technical and Operational Documentation
+  Version 2.1 — Technical and Operational Documentation
 </Callout>
 
 The LANDTTS platform is a purpose-built clinical transport management system for NHS-contracted
@@ -14,16 +14,16 @@ and fragmented admin processes with a unified digital workflow from booking to f
 
 <Cards>
   <Card title="Booking Management" href="/booking-lifecycle">
-    7-step PTF wizard with clinical risk assessment, mileage calculation, and return leg handling
+    7-step PTF wizard with clinical risk assessment, mileage calculation, multi-leg journeys, and return leg handling
   </Card>
   <Card title="Dispatch Operations" href="/dispatch-operations">
-    Real-time dispatch board with crew assignment, compliance checks, and WebSocket live updates
+    Real-time dispatch board with crew assignment, compliance checks, and WebSocket live updates via Kong API Gateway
   </Card>
   <Card title="Mobile Crew Workflow" href="/mobile-crew">
-    Job acceptance, GPS-tracked journey, arrival logging, and clinical handover
+    Job acceptance, GPS-tracked journey, biometric auth, trip intelligence, offline sync, and clinical handover
   </Card>
-  <Card title="Factorial HR Integration" href="/factorial-integration">
-    Shift sync, absence tracking, clock in/out, timesheet approvals via Factorial 2026-01-01 API
+  <Card title="Factorial HR & Deel Integration" href="/factorial-integration">
+    Shift sync, absence tracking, clock in/out, timesheet approvals via Factorial 2026-01-01 API or Deel REST v2
   </Card>
   <Card title="Billing & Accounting" href="/billing-accounting">
     Rate card invoicing, PDF generation, Xero synchronisation
@@ -37,17 +37,17 @@ and fragmented admin processes with a unified digital workflow from booking to f
 
 | Layer | Technology |
 |---|---|
-| Web App | React (Vite) |
-| Mobile App | React Native (Expo SDK 50) |
-| API Gateway | Port 8000, routes to 19 microservices |
-| Services | Express.js, ports 3001–3018 |
-| Database | PostgreSQL 15+ with Prisma ORM |
-| Cache / PubSub | Redis 7+ |
-| Identity | Keycloak OIDC with TOTP MFA |
-| Storage | Amazon S3 (signatures, PDFs, documents) |
-| Integrations | Xero (accounting), Factorial HR (payroll), Mapbox (geocoding) |
+| Web App | React 18 (Vite 5) |
+| Mobile App | React Native 0.73.6 (Expo SDK 50) |
+| API Gateway | Kong 3.7 (DB-less declarative), port 8000 |
+| Services | 18 Express.js microservices, ports 3001–3018 |
+| Database | PostgreSQL 16 (primary + audit) with Prisma 5.13 ORM |
+| Cache / PubSub | Redis 7 (cache, pub/sub, streams) |
+| Object Storage | MinIO (S3-compatible) — signatures, PDFs, documents |
+| Identity | Keycloak 24 OIDC with PKCE + TOTP MFA |
+| Integrations | Xero (accounting) · Factorial HR + Deel (payroll) · Mapbox (geocoding) · Twilio (SMS) · APNs/FCM (push) |
+| Monorepo | Turborepo 2.0, npm 10.5 workspaces |
 
 ## Screenshot Reference
-
 
 ![Dashboard Overview](/images/04-dashboard-overview.png)

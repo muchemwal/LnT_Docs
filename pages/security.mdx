@@ -6,34 +6,54 @@ import { Callout } from 'nextra/components'
 
 | Layer | Implementation |
 |---|---|
-| PHI at rest | AES-256 via `CryptoService`. Stored as `Bytes` in PostgreSQL. |
+| PHI at rest | AES-256 via `CryptoService` (`@landtts/shared`). Stored as `Bytes` in PostgreSQL. |
 | Messages | End-to-end encryption. Server never holds plaintext. |
-| Data in transit | TLS 1.2+ for all API communication. |
+| Data in transit | TLS 1.2+ for all API communication. Kong terminates SSL on port 8443. |
 | Incident data | Location, description, persons_involved encrypted. |
+| Object storage | MinIO with server-side encryption for signatures, documents, PDFs. |
 
 ## Authentication Flow
 
 1. User submits credentials to `POST /v1/auth/login`
-2. Auth service exchanges with Keycloak token endpoint
+2. Auth service exchanges with Keycloak 24 token endpoint (PKCE S256)
 3. If MFA required → Keycloak returns `CONFIGURE_TOTP`
-4. JWT access + refresh tokens issued
+4. JWT access + refresh tokens issued (60-minute TTL)
 5. Middleware validates on every request
 6. Failed logins tracked → account locks after threshold
+
+### Mobile Biometric Authentication
+
+- `react-native-keychain` stores encrypted tokens in device secure enclave
+- Face ID / Touch ID / Fingerprint unlock for returning sessions
+- Biometric fallback to Keycloak re-authentication
 
 ![Keycloak Login](/images/01-keycloak-login.png)
 ![MFA Setup](/images/02-mfa-totp-setup.png)
 
+## Kong API Gateway Security
+
+Kong 3.7 (DB-less declarative config) provides:
+
+| Feature | Description |
+|---|---|
+| Rate limiting | 100 requests/minute per consumer, configurable per route |
+| IP restriction | Admin and audit routes restricted to internal IPs |
+| Request size limits | Configurable per endpoint (signatures: 10 MB, documents: 25 MB) |
+| CORS | Scoped to known origins (web app, mobile) |
+| mTLS | Linkerd service mesh for inter-service communication |
+
 ## RBAC Enforcement
 
 Two levels:
-1. **API Middleware** — `requireRole()` validates JWT role claim. Unauthorised → HTTP 403.
-2. **Data Scoping** — Crew sees only own jobs. Clients see only own org bookings.
+1. **API Middleware** — `requireRole()` from `@landtts/shared` validates JWT role claim. Unauthorised → HTTP 403.
+2. **Data Scoping** — Crew sees only own jobs. Clients see only own org bookings (via `ClientUser.can_view_all`).
 
 ## Session Management
 
-- Access tokens: short expiry (~15 min)
+- Access tokens: 60-minute expiry (Keycloak realm config)
 - Refresh: `POST /v1/auth/refresh`
 - Logout: `POST /v1/auth/logout` → Keycloak session invalidation
+- Mobile: tokens stored in device keychain with biometric lock
 
 ## Threat Protection
 
@@ -41,3 +61,23 @@ Two levels:
 - File upload limits: signatures 10 MB, documents 25 MB, attachments 20 MB
 - Pagination max 100 records
 - PHI detection in messaging service
+- Kong rate limiting (100 req/min default)
+- IP restriction on admin/audit/compliance routes
+- WAF rules (Cloudflare) in production
+
+## Audit Trail
+
+Every data modification is recorded to the **separate audit database** (PostgreSQL port 5433):
+- INSERT-only — no UPDATE or DELETE operations permitted
+- Dedicated `landtts_audit` database with restricted INSERT-only role
+- Records: event_type, actor_id, actor_ip, resource_type, resource_id, previous_value, new_value
+- Retained indefinitely
+
+## Shared Security Packages
+
+The `@landtts/shared` package provides:
+- `CryptoService` — AES-256 PHI encryption/decryption
+- `requireRole()` — RBAC middleware
+- `rate-limiter` — Per-route rate limiting
+- `error-envelope` — Standardised error responses (never leak internals)
+- `ApiClient` — Authenticated HTTP client for inter-service calls

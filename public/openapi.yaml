@@ -5,7 +5,7 @@ info:
     Comprehensive API for the LANDTTS clinical patient transport management platform.
     All endpoints require JWT Bearer authentication via Keycloak OIDC.
     PHI fields are AES-256 encrypted at rest.
-  version: 2.0.0
+  version: 2.1.0
   contact:
     name: Platform Engineering Team
     email: ops@landtts.co.uk
@@ -13,10 +13,10 @@ info:
     name: Proprietary
 
 servers:
+  - url: https://51.75.168.48.nip.io
+    description: Production (OVH)
   - url: http://localhost:8000
     description: Development API Gateway
-  - url: http://192.168.101.101:8000
-    description: Mobile Development Gateway
 
 tags:
   - name: Auth
@@ -777,6 +777,288 @@ components:
           type: string
           enum: [string, number, boolean, json, select]
 
+    UserPreference:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        category:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+
+    CrewRole:
+      type: string
+      enum: [driver, medic, escort, supervisor, relief_driver]
+
+    CrewDutyStatus:
+      type: string
+      enum: [active_transport, standby_waiting, off_duty_rest, accommodation_rest]
+
+    SegmentType:
+      type: string
+      enum: [pickup, travel, wait_at_facility, appointment, fuel_stop, meal_stop, rest_stop, accommodation, shift_change, return_transport, destination_handover]
+
+    JobCrewAssignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        crew_member_id:
+          type: string
+          format: uuid
+        crew_role:
+          $ref: '#/components/schemas/CrewRole'
+        duty_status:
+          $ref: '#/components/schemas/CrewDutyStatus'
+        is_lead:
+          type: boolean
+        assigned_at:
+          type: string
+          format: date-time
+
+    JobTransportLeg:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        leg_number:
+          type: integer
+        origin:
+          type: string
+        destination:
+          type: string
+        estimated_duration_minutes:
+          type: integer
+        status:
+          type: string
+
+    JobSegment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        leg_id:
+          type: string
+          format: uuid
+        segment_type:
+          $ref: '#/components/schemas/SegmentType'
+        start_at:
+          type: string
+          format: date-time
+        end_at:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+
+    JobAccommodation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        facility_name:
+          type: string
+        check_in_at:
+          type: string
+          format: date-time
+        check_out_at:
+          type: string
+          format: date-time
+          nullable: true
+        cost:
+          type: number
+          nullable: true
+
+    JobMeal:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        meal_type:
+          type: string
+          enum: [breakfast, lunch, dinner, snack]
+        cost:
+          type: number
+          nullable: true
+        recorded_at:
+          type: string
+          format: date-time
+
+    JobExpense:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        job_id:
+          type: string
+          format: uuid
+        expense_type:
+          type: string
+          enum: [fuel, parking, toll, other]
+        amount:
+          type: number
+        description:
+          type: string
+          nullable: true
+        recorded_at:
+          type: string
+          format: date-time
+
+    PTFSafeguarding:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        concern_type:
+          type: string
+        description:
+          type: string
+          description: Encrypted
+        action_taken:
+          type: string
+        reported_to:
+          type: string
+        recorded_by:
+          type: string
+          format: uuid
+        recorded_at:
+          type: string
+          format: date-time
+
+    PTFHandoverChecklist:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        ptf_id:
+          type: string
+          format: uuid
+        patient_condition:
+          type: string
+          nullable: true
+        medications_given:
+          type: string
+          nullable: true
+        observations:
+          type: string
+          nullable: true
+        equipment_returned:
+          type: boolean
+          nullable: true
+        patient_belongings:
+          type: boolean
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        completed_by:
+          type: string
+          format: uuid
+        completed_at:
+          type: string
+          format: date-time
+
+    TimeEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        crew_member_id:
+          type: string
+          format: uuid
+        shift_id:
+          type: string
+          format: uuid
+          nullable: true
+        entry_type:
+          type: string
+          enum: [check_in, check_out, break_start, break_end]
+        latitude:
+          type: number
+          nullable: true
+        longitude:
+          type: number
+          nullable: true
+        device_id:
+          type: string
+          nullable: true
+        recorded_at:
+          type: string
+          format: date-time
+
+    NotificationReceipt:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        notification_id:
+          type: string
+          format: uuid
+        channel:
+          type: string
+          enum: [push_ios, push_android, sms, email, sse]
+        status:
+          type: string
+          enum: [pending, delivered, failed]
+        delivered_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ClientUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        can_book:
+          type: boolean
+        can_view_all:
+          type: boolean
+
 
 paths:
   # ═══════════════════════════════════════════════════════════════════════════
@@ -882,6 +1164,7 @@ paths:
     get:
       tags: [Auth]
       summary: List all users (admin only)
+      description: Returns all Keycloak users with roles, last login, and active session count.
       parameters:
         - name: role
           in: query
@@ -893,12 +1176,98 @@ paths:
             type: boolean
       responses:
         '200':
-          description: User list
+          description: User list with enriched data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        email:
+                          type: string
+                        first_name:
+                          type: string
+                        last_name:
+                          type: string
+                        username:
+                          type: string
+                        enabled:
+                          type: boolean
+                        role:
+                          type: string
+                          nullable: true
+                        created_at:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        last_login:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        active_sessions:
+                          type: integer
+    post:
+      tags: [Auth]
+      summary: Create a new user (admin/HR)
+      description: Creates user in Keycloak, assigns role, syncs to Postgres, sends welcome email via Resend.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, first_name, last_name]
+              properties:
+                email:
+                  type: string
+                  format: email
+                first_name:
+                  type: string
+                last_name:
+                  type: string
+                role:
+                  $ref: '#/components/schemas/Role'
+                password:
+                  type: string
+                  description: Initial password (if blank, user receives set-password email)
+                temporary_password:
+                  type: boolean
+                  default: true
+                  description: Force password change on first login
+      responses:
+        '201':
+          description: User created successfully
+        '409':
+          description: User already exists
+
+  /v1/auth/users/{id}:
+    delete:
+      tags: [Auth]
+      summary: Permanently delete a user
+      description: Removes from Keycloak and Postgres. Cannot be undone.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User deleted
 
   /v1/auth/users/{id}/role:
     put:
       tags: [Auth]
       summary: Update user role
+      description: Changes the Keycloak realm role and syncs to Postgres.
       parameters:
         - name: id
           in: path
@@ -920,10 +1289,55 @@ paths:
         '200':
           description: Role updated
 
-  /v1/auth/users/{id}/unlock:
-    put:
+  /v1/auth/users/{id}/reset-password:
+    post:
       tags: [Auth]
-      summary: Unlock a locked user account
+      summary: Force reset a user's password (admin only)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_password]
+              properties:
+                new_password:
+                  type: string
+                temporary:
+                  type: boolean
+                  default: true
+                  description: Force change on next login
+      responses:
+        '200':
+          description: Password reset successfully
+
+  /v1/auth/users/{id}/suspend:
+    post:
+      tags: [Auth]
+      summary: Suspend (disable) a user account
+      description: User cannot log in until reactivated. Synced to Postgres account_locked field.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Account suspended
+
+  /v1/auth/users/{id}/unlock:
+    post:
+      tags: [Auth]
+      summary: Unlock/reactivate a suspended user account
       parameters:
         - name: id
           in: path
@@ -1304,9 +1718,97 @@ paths:
         '422':
           description: Cannot reassign completed job
 
-  /v1/jobs/{id}/tracking-link:
+  /v1/jobs/{id}/share:
     post:
       tags: [Jobs]
+      summary: Generate a live trip share link (Bolt-style)
+      description: Creates a signed time-limited URL for public tracking. Token expires after 24h or job completion.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Share link generated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  share_url:
+                    type: string
+                    format: uri
+                  share_token:
+                    type: string
+                  expires_at:
+                    type: string
+                    format: date-time
+                  job_id:
+                    type: string
+                  reference:
+                    type: string
+
+  /v1/jobs/track/{token}:
+    get:
+      tags: [Jobs]
+      summary: Public tracking endpoint (no auth required)
+      description: Returns live job status, GPS position, crew first name, masked vehicle reg. Used by the share link.
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Live tracking data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  reference:
+                    type: string
+                  status:
+                    type: string
+                  crew:
+                    type: object
+                    nullable: true
+                    properties:
+                      name:
+                        type: string
+                        description: First name only
+                  vehicle:
+                    type: object
+                    nullable: true
+                    properties:
+                      registration:
+                        type: string
+                        description: Masked (***ABC)
+                      make:
+                        type: string
+                      model:
+                        type: string
+                  position:
+                    type: object
+                    nullable: true
+                    properties:
+                      lat:
+                        type: number
+                      lng:
+                        type: number
+                      heading:
+                        type: number
+                      speed_kmh:
+                        type: number
+                  completed:
+                    type: boolean
+        '410':
+          description: Tracking link expired
       summary: Generate a 24-hour tracking link for a job
       parameters:
         - name: id
@@ -1330,6 +1832,218 @@ paths:
                   expires_at:
                     type: string
                     format: date-time
+
+  /v1/jobs/{id}/crew-assignments:
+    post:
+      tags: [Jobs]
+      summary: Add a crew assignment to a job (multi-crew support)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [crew_member_id, crew_role]
+              properties:
+                crew_member_id:
+                  type: string
+                  format: uuid
+                crew_role:
+                  $ref: '#/components/schemas/CrewRole'
+                is_lead:
+                  type: boolean
+                  default: false
+      responses:
+        '201':
+          description: Crew assignment created
+        '422':
+          description: Compliance violation or duplicate assignment
+    get:
+      tags: [Jobs]
+      summary: List crew assignments for a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Crew assignment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobCrewAssignment'
+
+  /v1/jobs/{id}/transport-legs:
+    post:
+      tags: [Jobs]
+      summary: Add a transport leg to a multi-leg job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [origin, destination]
+              properties:
+                leg_number:
+                  type: integer
+                origin:
+                  type: string
+                destination:
+                  type: string
+                estimated_duration_minutes:
+                  type: integer
+      responses:
+        '201':
+          description: Transport leg created
+    get:
+      tags: [Jobs]
+      summary: List transport legs for a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Transport legs with segments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobTransportLeg'
+
+  /v1/jobs/{id}/accommodation:
+    post:
+      tags: [Jobs]
+      summary: Record accommodation for a long-distance job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [facility_name, check_in_at]
+              properties:
+                facility_name:
+                  type: string
+                check_in_at:
+                  type: string
+                  format: date-time
+                check_out_at:
+                  type: string
+                  format: date-time
+                cost:
+                  type: number
+      responses:
+        '201':
+          description: Accommodation recorded
+
+  /v1/jobs/{id}/meals:
+    post:
+      tags: [Jobs]
+      summary: Record a meal during a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [meal_type]
+              properties:
+                meal_type:
+                  type: string
+                  enum: [breakfast, lunch, dinner, snack]
+                cost:
+                  type: number
+      responses:
+        '201':
+          description: Meal recorded
+
+  /v1/jobs/{id}/expenses:
+    post:
+      tags: [Jobs]
+      summary: Record an expense during a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [expense_type, amount]
+              properties:
+                expense_type:
+                  type: string
+                  enum: [fuel, parking, toll, other]
+                amount:
+                  type: number
+                description:
+                  type: string
+      responses:
+        '201':
+          description: Expense recorded
+    get:
+      tags: [Jobs]
+      summary: List expenses for a job
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Expense list
 
 
   # ═══════════════════════════════════════════════════════════════════════════
@@ -1793,6 +2507,114 @@ paths:
                     items:
                       $ref: '#/components/schemas/WorkflowEvent'
 
+  /v1/ptfs/{id}/safeguarding:
+    post:
+      tags: [PTF Workflow]
+      summary: Record a safeguarding concern
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [concern_type, description, action_taken]
+              properties:
+                concern_type:
+                  type: string
+                description:
+                  type: string
+                  description: Will be encrypted
+                action_taken:
+                  type: string
+                reported_to:
+                  type: string
+      responses:
+        '201':
+          description: Safeguarding concern recorded (immutable)
+    get:
+      tags: [PTF Workflow]
+      summary: List safeguarding concerns for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Safeguarding records
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PTFSafeguarding'
+
+  /v1/ptfs/{id}/handover-checklist:
+    post:
+      tags: [PTF Workflow]
+      summary: Submit the handover checklist
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                patient_condition:
+                  type: string
+                medications_given:
+                  type: string
+                observations:
+                  type: string
+                equipment_returned:
+                  type: boolean
+                patient_belongings:
+                  type: boolean
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: Handover checklist submitted
+    get:
+      tags: [PTF Workflow]
+      summary: Get handover checklist for a PTF
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Handover checklist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/PTFHandoverChecklist'
+
 
   # ═══════════════════════════════════════════════════════════════════════════
   # GPS SERVICE (port 3004)
@@ -2186,6 +3008,105 @@ paths:
         '200':
           description: Change request reviewed
 
+  /v1/change-requests:
+    get:
+      tags: [Shifts]
+      summary: List all change requests (HR/admin)
+      description: Returns all pending change requests across all shifts, enriched with shift data.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+      responses:
+        '200':
+          description: List of change requests with shift info
+
+  /v1/shifts/{id}/check-in:
+    post:
+      tags: [Shifts]
+      summary: Crew GPS check-in to shift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                accuracy_metres:
+                  type: number
+      responses:
+        '200':
+          description: Checked in with GPS recorded
+
+  /v1/shifts/{id}/check-out:
+    post:
+      tags: [Shifts]
+      summary: Crew GPS check-out from shift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                accuracy_metres:
+                  type: number
+      responses:
+        '200':
+          description: Checked out, hours calculated
+
+  /v1/shifts/{id}/break-start:
+    post:
+      tags: [Shifts]
+      summary: Start a break during shift
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Break started, status set to on_break
+
+  /v1/shifts/{id}/break-end:
+    post:
+      tags: [Shifts]
+      summary: End break and resume availability
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Break ended, total break minutes updated
+
 
   # ═══════════════════════════════════════════════════════════════════════════
   # ROTA SERVICE — TIMESHEETS (port 3006)
@@ -2411,6 +3332,22 @@ paths:
       responses:
         '200':
           description: Employee updated
+    delete:
+      tags: [Employees]
+      summary: Delete employee record
+      description: Permanently deletes the employee and cascades absences. Returns 422 if FK references exist.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Employee deleted
+        '422':
+          description: Cannot delete — has active shift/job references
 
   /v1/employees/{id}/documents:
     post:
@@ -3629,6 +4566,112 @@ paths:
       responses:
         '200':
           description: Worked hours export data
+
+  /v1/hr/sync/clock-in:
+    post:
+      tags: [HR Integration]
+      summary: Real-time clock-in via Factorial/Deel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id]
+              properties:
+                employee_id:
+                  type: string
+                  format: uuid
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Clock-in synced to HR provider
+
+  /v1/hr/sync/clock-out:
+    post:
+      tags: [HR Integration]
+      summary: Real-time clock-out via Factorial/Deel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id]
+              properties:
+                employee_id:
+                  type: string
+                  format: uuid
+                timestamp:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Clock-out synced to HR provider
+
+  /v1/hr/sync/break-start:
+    post:
+      tags: [HR Integration]
+      summary: Sync break start to Factorial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id]
+              properties:
+                employee_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Break start synced
+
+  /v1/hr/sync/break-end:
+    post:
+      tags: [HR Integration]
+      summary: Sync break end to Factorial
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [employee_id]
+              properties:
+                employee_id:
+                  type: string
+                  format: uuid
+      responses:
+        '200':
+          description: Break end synced
+
+  /v1/hr/shifts:
+    get:
+      tags: [HR Integration]
+      summary: Read shifts from HR provider (Factorial/Deel)
+      parameters:
+        - name: employee_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Shifts from HR provider
 
   # ═══════════════════════════════════════════════════════════════════════════
   # ACCOUNTING INTEGRATION (port 3018)
