@@ -39,6 +39,22 @@ Assignment is performed through a modal with:
 On successful assignment, the crew receives a push notification within 5 seconds (via APNs/FCM).
 An unaccepted job triggers a dispatcher alert after 10 minutes via Redis tracking.
 
+## GPS Architecture
+
+```
+Mobile → WSS → Caddy → GPS Service (port 3004)
+                            ├── Persist to Postgres (gps_locations table)
+                            ├── Broadcast to Dispatch Board (WebSocket)
+                            └── Smart auto-transition (geofence triggers)
+```
+
+### GPS Auto-Transition
+
+When GPS indicates the crew has arrived at a location:
+- Within geofence radius of pickup → auto-suggests `at_pickup` status
+- Within geofence radius of destination → auto-suggests `at_destination` status
+- Crew confirms or dismisses the prompt
+
 ## Real-Time Monitoring
 
 - Live GPS map with crew positions (10-second updates via native WebSocket)
@@ -83,6 +99,27 @@ The `/services` page (administrator only) provides operational visibility into a
 - Last response time
 - Error rate monitoring
 - Service restart controls
+
+## Status Machine
+
+Valid transitions (defined in `status-machine.ts`):
+
+| From | To (allowed) |
+|---|---|
+| pending | accepted, cancelled |
+| accepted | en_route, cancelled |
+| en_route | at_pickup, cancelled |
+| at_pickup | in_transit, cancelled |
+| in_transit | at_destination, completed, cancelled |
+| at_destination | completed, cancelled |
+| completed | (terminal) |
+| cancelled | (terminal) |
+
+Legacy aliases: `on_scene` = `at_pickup`, `patient_loaded` = `in_transit`
+
+## Geocode Endpoint
+
+`POST /v1/geocode` — Geocode an address to lat/lng coordinates. Used for pickup/destination geocoding during job creation.
 
 {/* TODO: Screenshot placeholder */}
 ![Service Manager](/images/service-manager-placeholder.png)
