@@ -124,11 +124,13 @@ The mobile app includes a `TripIntelligenceService` providing smart contextual p
 
 ## GPS Tracking
 
-- Location updates every 10 seconds during active transport (native WebSocket via `ws`)
+- Location updates every **5 seconds** during active transport (foreground) / 15 seconds (background)
+- Native WebSocket streaming via `wss://domain/ws/gps`
+- Android: foreground service with persistent notification ("Tracking for dispatch")
 - Each update: latitude, longitude, accuracy (m), heading (°), speed (km/h), device ID
-- **Offline buffering**: locations stored locally via WatermelonDB and uploaded on reconnection (flagged `is_buffered`)
-- History: `GET /v1/gps/jobs/:job_id/history`
-- Current: `GET /v1/gps/jobs/:job_id/current`
+- **Offline buffering**: queues up to 500 points in memory, exponential backoff reconnection (2s → 60s max), batch replay on reconnect
+- History: `GET /v1/gps/positions/:jobId`
+- Latest: `GET /v1/gps/latest/:crewId`
 
 ![GPS Tracking](/images/39-mobile-gps-tracking.png)
 
@@ -228,3 +230,34 @@ Secure crew-to-dispatch communication:
 
 {/* TODO: Screenshot placeholder */}
 ![Mobile Messaging](/images/mobile-messaging-placeholder.png)
+
+## Push-to-Talk
+
+Tap the PTT button on Dashboard:
+- "Record Message" (audio via expo-av) for up to 10 seconds
+- "Text Message" opens the Messaging tab
+- Voice messages delivered instantly to dispatch
+
+{/* TODO: Screenshot placeholder */}
+![Push-to-Talk](/images/mobile-push-to-talk-placeholder.png)
+
+## Medication Recording (Mobile)
+
+During an active job, crew can record medication administration:
+- "💊 Record Medication" button on job detail screen
+- Select from patient's known medications (from linked PTF)
+- Record: medication name, dose, route, time given, next due
+- Push notification 5 minutes before `next_due_at`
+- Overdue medications shown with ⚠️ indicator
+
+{/* TODO: Screenshot placeholder */}
+![Mobile Medication](/images/mobile-medication-recording-placeholder.png)
+
+## Settings
+
+- Notification preferences
+- Biometric login toggle
+- Privacy Policy link
+- User Guide link
+- **Delete Account** (Apple requirement — permanent, with double confirmation)
+- Sign Out

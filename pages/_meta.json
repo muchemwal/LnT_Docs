@@ -6,10 +6,13 @@
   "mobile-crew": "Mobile Crew Workflow",
   "clinical-handover": "Clinical Handover & Signatures",
   "compliance-closure": "Compliance Closure",
+  "rota-scheduling": "Rota & Scheduling",
   "factorial-integration": "Factorial HR & Deel Integration",
   "billing-accounting": "Billing & Accounting",
   "security": "Security Architecture",
   "nhs-compliance": "NHS Compliance & GDPR",
   "api-reference": "API Reference",
-  "deployment": "Deployment Guide"
+  "deployment": "Deployment Guide",
+  "privacy": "Privacy Policy",
+  "terms": "Terms of Service"
 }

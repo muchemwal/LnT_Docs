@@ -1,0 +1,184 @@
+# Rota & Scheduling
+
+import { Callout, Tabs, Tab } from 'nextra/components'
+
+The Rota page (`/rota`) has two tabs: **Rota** (shift management) and **Timesheets** (approval workflow).
+
+## Three Rota Views
+
+| View | Description |
+|---|---|
+| **Week** | Grid: crew × days, colour-coded by role, drag-and-drop, time-proportional blocks |
+| **Day** | Google Calendar-style timeline (05:00–22:00), column layout for overlaps (20+ crew) |
+| **Table** | Sortable list with edit/delete per row |
+
+{/* TODO: Screenshot placeholders */}
+![Rota Week View](/images/rota-week-view-placeholder.png)
+![Rota Day View](/images/rota-day-view-placeholder.png)
+
+## Shift Operations
+
+| Operation | Description |
+|---|---|
+| Add Shift | Bottom-sheet modal: crew picker, role grid, day selector, time pickers |
+| Bulk Create | Multiple days, same crew/role |
+| Edit Shift | Click any block |
+| Delete Shift | Blocked for past shifts (backend returns `422 PAST_SHIFT`) |
+| Move Shift | Drag-and-drop to a new day (blocked for past) |
+| Copy to Next Week | Duplicate a shift +7 days |
+| Export to Excel | `.xlsx` with all shift data |
+| Import from Excel | Upload template, auto-creates shifts via API |
+| Publish | Publishes draft shift + sends push notification to crew |
+
+### Past Shift Protection
+
+- Cannot edit, delete, or move shifts with `end_at < NOW()`
+- Table view shows grey "Past" badge
+- Backend enforces at PATCH/DELETE routes
+
+## Crew Teams
+
+Crew Teams let you group employees for quick assignment:
+
+### Create/Edit Team
+- Name and description
+- Assign a team lead
+- Add/remove members via dropdown (shows all employees)
+- Member chips with remove button
+
+### Using Teams
+- **PTF Form (Step 5)** — "Assign Team" dropdown above individual crew selects. Selecting auto-fills all slots.
+- **Dispatch JobList** — "Assign Team" dropdown auto-assigns team lead and fills crew count.
+
+### Deactivate Team
+- Soft delete — team no longer appears in assignment dropdowns
+- Inactive teams visible in a collapsible section
+
+{/* TODO: Screenshot placeholder */}
+![Crew Teams](/images/crew-teams-placeholder.png)
+
+## Change Request Approval
+
+Amber banner appears when crew submit change requests:
+- Shows type (Time Change / Swap / Cancel)
+- Full reason + proposed alternative
+- ✓ Approve (updates shift times) or ✕ Reject (with reason)
+- Crew notified of decision via push
+
+{/* TODO: Screenshot placeholder */}
+![Change Request Banner](/images/change-request-banner-placeholder.png)
+
+## Timesheets Tab
+
+1. HR generates timesheets for a period
+2. System calculates: shifts worked, scheduled hours, actual hours, breaks, overtime
+3. HR approves or rejects (with reason)
+4. Approved timesheets sync to Factorial HR / Deel
+
+{/* TODO: Screenshot placeholder */}
+![Timesheets Tab](/images/timesheets-tab-placeholder.png)
+
+## Leave & Availability
+
+Crew can request leave and set availability:
+
+| Feature | Description |
+|---|---|
+| Leave requests | Submit with type, dates, reason. HR approves/rejects. |
+| Availability | Set available time windows for scheduling |
+| Shift swaps | Request swap with another crew member |
+| Announcements | HR/admin can post announcements visible to all crew |
+
+## Mobile Shift Features
+
+### My Shifts (ShiftScheduleScreen)
+- List of upcoming shifts with status badges
+- **Confirm** shift (acknowledges publication)
+- **Request Change** — enhanced modal:
+  - Type: ⏰ Time Change / 🔄 Swap / ❌ Cancel
+  - Proposed date/time (optional)
+  - Quick reason chips (Illness, Childcare, School run, etc.)
+  - Free text reason
+
+### Shift Check-in/out (Dashboard)
+- Check In: records GPS + timestamp → creates `TimeEntry`
+- Check Out: records GPS, calculates hours worked
+- Break: start/end with live timer
+- All feeds into timesheet generation and Factorial/Deel sync
+
+### Smart Shift Intelligence
+
+| Trigger | Prompt |
+|---|---|
+| 15 min before shift | "Shift Starting Soon — Check In" |
+| 30 min before end | "Shift Ending Soon — Wrap up" |
+| At shift end | "Shift Has Ended — Check Out" |
+| 15 min overtime | "Overtime Warning" |
+| Dismissed 2× | "Auto Check-Out in 10 min" (non-dismissable) |
+| 30 min idle (no job) | "Awaiting Dispatch — Contact dispatch" |
+
+## WebSocket
+
+Real-time rota canvas sync via `wss://domain/ws/rota`.
+
+## API Endpoints
+
+### Shifts
+
+```
+POST   /v1/shifts                    — Create (overlap + WTR check)
+POST   /v1/shifts/bulk               — Bulk create
+GET    /v1/shifts                    — List (date range, crew, status)
+GET    /v1/shifts/:id                — Get single
+PATCH  /v1/shifts/:id                — Update (blocked for past)
+DELETE /v1/shifts/:id                — Soft-delete (blocked for past)
+POST   /v1/shifts/:id/publish        — Publish + notify crew
+POST   /v1/shifts/:id/check-in       — GPS check-in
+POST   /v1/shifts/:id/check-out      — GPS check-out
+POST   /v1/shifts/:id/break-start    — Start break
+POST   /v1/shifts/:id/break-end      — End break
+POST   /v1/shifts/:id/confirm        — Crew confirms shift
+POST   /v1/shifts/:id/change-requests — Submit change request
+GET    /v1/shifts/:id/change-requests — List shift's requests
+```
+
+### Change Requests
+
+```
+GET    /v1/change-requests           — All pending (HR/admin)
+PATCH  /v1/change-requests/:id       — Approve/reject
+```
+
+### Crew Teams
+
+```
+POST   /v1/crew-teams                — Create team (admin/HR)
+GET    /v1/crew-teams                — List teams (?active=true)
+GET    /v1/crew-teams/:id            — Get team with member details
+PATCH  /v1/crew-teams/:id            — Update (name, lead, members)
+DELETE /v1/crew-teams/:id            — Deactivate team
+```
+
+### Timesheets
+
+```
+POST   /v1/timesheets/generate       — Generate for period
+GET    /v1/timesheets                — List timesheets
+GET    /v1/timesheets/summary        — KPI summary
+PATCH  /v1/timesheets/:id/approve    — Approve
+PATCH  /v1/timesheets/:id/reject     — Reject (with note)
+POST   /v1/timesheets/:id/sync       — Sync to Factorial HR
+```
+
+### Leave & Availability
+
+```
+POST   /v1/leave-requests            — Submit leave request
+GET    /v1/leave-requests            — List leave requests
+PATCH  /v1/leave-requests/:id        — Approve/reject
+GET    /v1/availability              — Get crew availability
+POST   /v1/availability              — Set availability
+POST   /v1/shift-swaps               — Request shift swap
+GET    /v1/announcements             — Get announcements
+POST   /v1/announcements             — Create announcement
+```

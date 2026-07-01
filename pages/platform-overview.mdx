@@ -72,27 +72,35 @@ Presentation ─── React 18 Web (Vite 5) + React Native Mobile (Expo SDK 50)
 
 ## Web Application Pages
 
-| Route | Access | Description |
+The admin sidebar is organised into 4 sections. Pages with related sub-features use tabbed interfaces:
+
+### Sidebar Navigation (Administrator)
+
+| Section | Items |
+|---|---|
+| Operations | Dashboard, Dispatch, Patient Forms, Rota |
+| Resources | People, Vehicles, Clients |
+| Compliance | Incidents, Governance |
+| Admin | Users, Billing, Analytics, Settings |
+
+### Tabbed Pages
+
+| Page | Tab 1 | Tab 2 |
 |---|---|---|
-| `/dashboard` | All authenticated | Overview KPIs and recent activity |
-| `/dispatch` | dispatcher, administrator | Real-time dispatch board |
-| `/ptfs` | dispatcher, administrator, client | PTF list with search/filter |
-| `/ptfs/:id` | dispatcher, administrator, client | PTF detail view |
-| `/rota` | hr_manager, administrator | Rota canvas / shift scheduling |
-| `/employees` | hr_manager, administrator | Employee management |
-| `/clients` | dispatcher, administrator, client | Client organisations |
-| `/vehicles` | administrator | Fleet management |
-| `/incidents` | administrator | Incident dashboard |
-| `/billing` | administrator | Billing dashboard |
-| `/analytics` | administrator, hr_manager | KPI analytics |
-| `/timesheets` | administrator, hr_manager | Timesheet approval workflow |
-| `/audit` | administrator | Audit log viewer |
-| `/consent` | administrator | Consent management |
-| `/users` | administrator | User management |
-| `/settings` | All authenticated | User/org settings |
-| `/services` | administrator | Service manager |
-| `/bookings` | client, administrator, dispatcher | Client portal |
-| `/track/:token` | Public | Live tracking link (24-hour expiry) |
+| People (`/employees`) | 👤 Employees | 👥 Crew Teams |
+| Rota (`/rota`) | 📅 Rota | ⏱️ Timesheets |
+| Users (`/users`) | 👤 Users | 📱 Devices |
+| Settings (`/settings`) | ⚙️ Settings | 🔧 Services |
+| Governance (`/audit`) | 📋 Audit Log | ✅ Consent |
+
+### Role-Based Access
+
+| Role | Pages |
+|---|---|
+| Administrator | All pages, all tabs |
+| Dispatcher | Dashboard, Dispatch, Patient Forms, Clients, Settings |
+| HR Manager | Dashboard, Rota (+Timesheets), People (+Crew Teams), Analytics, Settings |
+| Client | Dashboard, Bookings, Clients, Patient Forms, Settings |
 
 ## Operational Workflows
 

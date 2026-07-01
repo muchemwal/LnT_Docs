@@ -65,7 +65,11 @@ Each risk can have accompanying notes.
 
 - Internal users: crew dropdown, vehicle dropdown, escort options
 - External users: free-form crew name textarea
-- **Multi-crew assignment**: assign multiple crew members with roles (driver, medic, escort, supervisor, relief_driver) and duty status
+- **Assign Team** dropdown — selecting a crew team auto-fills all member slots
+- Number of crew (1-4) with individual crew member selects and lead designation
+- **Multi-crew assignment**: roles (driver, medic, escort, supervisor, relief_driver)
+- Vehicle assignment
+- Escort required (with escort count and names)
 
 ![Crew Internal](/images/20-step6-crew-internal.png)
 
@@ -173,3 +177,53 @@ clinical_notes, handover_notes, transfer_origin, transfer_destination
 ```
 
 Decryption happens only at the API response layer via `decryptPtfRecord()`.
+
+## Medication Administration
+
+### Recording Medications (PTF Detail page)
+
+The PTF detail page includes a **Medication Administration Log** section:
+- Table: medication name, dose, route, given at, next due, notes
+- Overdue medications highlighted in red with ⚠️ indicator
+- "💊 Record Administration" button opens inline form
+
+### Recording Form Fields
+
+| Field | Description |
+|---|---|
+| Medication name | Required |
+| Dose | e.g. "1g", "500mg" |
+| Route | oral, IV, IM, SC, topical, inhaled, rectal, sublingual, other |
+| Given at | Datetime (required) |
+| Next due at | Datetime (optional — triggers crew notifications) |
+| Notes | Optional free text |
+
+### Mobile Medication Recording
+
+During active jobs, crew can record medication via the job detail screen:
+- Select from patient's known medications (from PTF)
+- Record: medication name, dose, route, time given, next due
+- Push notification 5 minutes before `next_due_at`
+
+### Due Medications Query
+
+`GET /v1/medication-administrations/due?minutes=5` returns all medications due within the specified window, used by the notification system.
+
+{/* TODO: Screenshot placeholder */}
+![Medication Administration Log](/images/medication-admin-log-placeholder.png)
+
+### API Endpoints
+
+```
+POST /v1/ptfs/:id/medication-administrations   — Record medication given
+GET  /v1/ptfs/:id/medication-administrations   — List medications for PTF
+GET  /v1/medication-administrations/due         — Medications due soon (?minutes=5)
+```
+
+## MHA Compliance Fields
+
+For Mental Health Act transfers, additional compliance fields are captured:
+- Authority to convey
+- Medical recommendations
+- AMHP (Approved Mental Health Professional) application
+- Section documentation references

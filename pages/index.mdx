@@ -1,29 +1,31 @@
-# LANDTTS Digital Patient Transport Platform
+# L&T Patient Transport — Platform Documentation
 
 import { Callout, Cards, Card } from 'nextra/components'
 
 <Callout type="info">
-  Version 2.1 — Technical and Operational Documentation
+  Version 2.1 — Technical and Operational Documentation — Last updated July 2026
 </Callout>
 
-The LANDTTS platform is a purpose-built clinical transport management system for NHS-contracted
-patient transfer services. It replaces paper-based Patient Transfer Forms (PTFs), manual dispatch,
-and fragmented admin processes with a unified digital workflow from booking to financial reconciliation.
+L&T Patient Transport is a full-stack platform for managing non-emergency patient transfers
+across the UK. It includes a web dashboard, mobile crew app, client portal, and 18 microservices.
 
 ## Core Capabilities
 
 <Cards>
   <Card title="Booking Management" href="/booking-lifecycle">
-    7-step PTF wizard with clinical risk assessment, mileage calculation, multi-leg journeys, and return leg handling
+    7-step PTF wizard with clinical risk, medication recording, mileage calculation, and return legs
   </Card>
   <Card title="Dispatch Operations" href="/dispatch-operations">
-    Real-time dispatch board with crew assignment, compliance checks, and WebSocket live updates via Kong API Gateway
+    Real-time dispatch board with crew/team assignment, GPS tracking, and live trip sharing
   </Card>
   <Card title="Mobile Crew Workflow" href="/mobile-crew">
-    Job acceptance, GPS-tracked journey, biometric auth, trip intelligence, offline sync, and clinical handover
+    Job acceptance, GPS tracking, biometric auth, trip intelligence, medication recording, offline sync
   </Card>
-  <Card title="Factorial HR & Deel Integration" href="/factorial-integration">
-    Shift sync, absence tracking, clock in/out, timesheet approvals via Factorial 2026-01-01 API or Deel REST v2
+  <Card title="Rota & Scheduling" href="/rota-scheduling">
+    Shift management, crew teams, timesheets, leave requests, change request approval
+  </Card>
+  <Card title="Factorial HR & Deel" href="/factorial-integration">
+    Shift sync, absence tracking, clock in/out, timesheet approvals via Factorial or Deel
   </Card>
   <Card title="Billing & Accounting" href="/billing-accounting">
     Rate card invoicing, PDF generation, Xero synchronisation
@@ -31,22 +33,34 @@ and fragmented admin processes with a unified digital workflow from booking to f
   <Card title="NHS Compliance" href="/nhs-compliance">
     DSPT alignment, UK GDPR, AES-256 PHI encryption, 8-year retention
   </Card>
+  <Card title="Privacy & Terms" href="/privacy">
+    Privacy policy and terms of service for platform users
+  </Card>
 </Cards>
 
 ## Architecture at a Glance
 
 | Layer | Technology |
 |---|---|
-| Web App | React 18 (Vite 5) |
-| Mobile App | React Native 0.73.6 (Expo SDK 50) |
+| Web App | React 18, TypeScript, Vite, TanStack Query |
+| Mobile App | React Native, Expo SDK 50, TypeScript |
 | API Gateway | Kong 3.7 (DB-less declarative), port 8000 |
+| Reverse Proxy | Caddy 2 (auto-HTTPS, WebSocket routing) |
 | Services | 18 Express.js microservices, ports 3001–3018 |
-| Database | PostgreSQL 16 (primary + audit) with Prisma 5.13 ORM |
+| Database | PostgreSQL 16 (primary + audit) with Prisma ORM |
 | Cache / PubSub | Redis 7 (cache, pub/sub, streams) |
 | Object Storage | MinIO (S3-compatible) — signatures, PDFs, documents |
 | Identity | Keycloak 24 OIDC with PKCE + TOTP MFA |
-| Integrations | Xero (accounting) · Factorial HR + Deel (payroll) · Mapbox (geocoding) · Twilio (SMS) · APNs/FCM (push) |
-| Monorepo | Turborepo 2.0, npm 10.5 workspaces |
+| Email | Resend API (transactional emails) |
+| Integrations | Xero · Factorial HR · Deel · Mapbox · Twilio · APNs/FCM |
+| Monorepo | Turborepo, npm workspaces |
+
+## Platform Summary
+
+- **Web Dashboard** — Dispatch board, rota management, analytics, billing, governance
+- **Mobile App** — Crew workflow (job acceptance, GPS tracking, shift check-in, PTFs, medication recording)
+- **Client Portal** — Booking requests, live transfer tracking
+- **Backend** — 18 microservices, Keycloak SSO, PostgreSQL, Redis, MinIO
 
 ## Screenshot Reference
 

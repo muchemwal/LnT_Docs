@@ -2,62 +2,63 @@
 
 import { Callout } from 'nextra/components'
 
-## Infrastructure Requirements
+## Infrastructure
 
-| Component | Requirement |
-|---|---|
-| PostgreSQL | 16+ (primary on 5432, audit on 5433) |
-| Redis | 7+ (caching, pub/sub, streams) |
-| MinIO | S3-compatible object storage (signatures, PDFs, documents) |
-| Keycloak | 24+ for OIDC identity management (PKCE S256) |
-| Kong | 3.7 API Gateway (DB-less declarative config) |
-| Node.js | 20+ LTS |
-| Docker | Container runtime |
-| npm | 10.5+ (package manager) |
-| Turborepo | 2.0+ (monorepo orchestration) |
+Single OVH Public Cloud instance (c2-15, 15 GB RAM):
+- All services run in Docker Compose
+- Domain set via `DOMAIN` env var in `.env.prod`
+
+| Component | Container | Port |
+|---|---|---|
+| Caddy (HTTPS proxy) | landtts-caddy | 80, 443 |
+| Kong (API gateway) | landtts-kong | 8000 |
+| Web App | landtts-web | 3000 |
+| API (all services) | landtts-api | 3001-3018 |
+| PostgreSQL Primary | landtts-pg | 5432 |
+| PostgreSQL Audit | landtts-pg-audit | 5432 |
+| Redis | landtts-redis | 6379 |
+| MinIO (S3) | landtts-minio | 9000 |
+| Keycloak | landtts-keycloak | 8080 |
 
 ## Deployment Options
 
-<Callout type="info">
-  The platform supports two deployment strategies: Kubernetes (AWS EKS) for production scale,
-  and single-EC2 (Docker Compose + Caddy) for smaller deployments.
-</Callout>
+The platform runs as a single Docker Compose stack. All 18 API services are run via `concurrently` in a single API container.
 
-### Option 1 — Kubernetes (AWS EKS)
+## WebSocket Routing (Caddyfile)
 
-Full Kubernetes deployment with 26 YAML manifests covering all services and infrastructure:
-- Service mesh via Linkerd (mTLS between services)
-- Horizontal pod autoscaling
-- Persistent volume claims for databases
-- Ingress via Kong
+```
+/ws/gps       → api:3004  (GPS streaming from mobile)
+/ws/dispatch  → api:3002  (Dispatch board live updates)
+/ws/rota      → api:3006  (Rota canvas real-time sync)
+/auth/*       → keycloak:8080
+/v1/*         → kong:8000
+/*            → web:3000
+```
 
-### Option 2 — Single EC2 (Docker Compose + Caddy)
+## Environment Variables (.env.prod)
 
-Suitable for smaller deployments on a single `t3.medium` instance (eu-west-2):
-- All services run via Docker Compose
-- Caddy reverse proxy with automatic Let's Encrypt HTTPS
-- Simplified operational overhead
-
-## Environment Variables
+Key variables (alphanumeric passwords only — no special characters):
 
 ```env
 # Database
-DATABASE_URL=postgresql://user:pass@localhost:5432/landtts
-AUDIT_DATABASE_URL=postgresql://user:pass@localhost:5433/landtts_audit
+POSTGRES_PRIMARY_PASSWORD=<hex>
+POSTGRES_AUDIT_PASSWORD=<hex>
 
 # Redis
-REDIS_URL=redis://localhost:6379
-REDIS_PASSWORD=...
+REDIS_PASSWORD=<hex>
 
 # Identity
-KEYCLOAK_BASE_URL=http://localhost:8080
-KEYCLOAK_REALM=landtts
+KEYCLOAK_ADMIN_USER=admin
+KEYCLOAK_ADMIN_PASSWORD=<hex>
 
-# Object Storage (MinIO / S3)
-AWS_S3_BUCKET=landtts-documents
-MINIO_ENDPOINT=http://localhost:9000
-MINIO_ROOT_USER=...
-MINIO_ROOT_PASSWORD=...
+# Security
+PHI_ENCRYPTION_KEY=<hex>
+
+# Email
+RESEND_API_KEY=re_xxxxx
+
+# Domain
+DOMAIN=<your-domain>
 
 # Integrations
 XERO_CLIENT_ID=...
@@ -67,16 +68,57 @@ FACTORIAL_CLIENT_ID=...
 FACTORIAL_CLIENT_SECRET=...
 FACTORIAL_WEBHOOK_SECRET=...
 DEEL_API_TOKEN=...
+```
 
-# Security
-PHI_ENCRYPTION_KEY=...
+## API Services (18)
 
-# Notifications
-TWILIO_ACCOUNT_SID=...
-TWILIO_AUTH_TOKEN=...
-APNS_KEY_ID=...
-APNS_TEAM_ID=...
-FCM_SERVER_KEY=...
+| Service | Port | Kong Paths |
+|---|---|---|
+| auth-service | 3001 | `/v1/auth`, `/v1/services`, `/v1/settings`, `/v1/preferences` |
+| job-service | 3002 | `/v1/jobs`, `/v1/geocode` |
+| ptf-service | 3003 | `/v1/ptfs`, `/v1/medication-administrations` |
+| gps-service | 3004 | `/v1/gps` |
+| messaging-service | 3005 | `/v1/conversations`, `/v1/messages` |
+| rota-service | 3006 | `/v1/shifts`, `/v1/rota`, `/v1/change-requests`, `/v1/timesheets`, `/v1/leave-requests`, `/v1/availability`, `/v1/shift-swaps`, `/v1/announcements`, `/v1/crew-teams` |
+| employee-service | 3007 | `/v1/employees`, `/v1/absences` |
+| client-service | 3008 | `/v1/clients` |
+| incident-service | 3009 | `/v1/incidents` |
+| vehicle-service | 3010 | `/v1/vehicles`, `/v1/equipment`, `/v1/fleet`, `/v1/defects`, `/v1/compliance-tasks`, `/v1/compliance-task-templates` |
+| notification-service | 3011 | `/v1/notifications` |
+| billing-service | 3012 | `/v1/invoices`, `/v1/rate-cards`, `/v1/billing` |
+| consent-service | 3013 | `/v1/consents` |
+| reporting-service | 3014 | `/v1/reports` |
+| audit-service | 3015 | `/v1/audit` |
+| compliance-service | 3016 | (internal only — Docker) |
+| hr-integration | 3017 | `/v1/hr` |
+| accounting-integration | 3018 | `/v1/accounting`, `/v1/xero` |
+
+## Deploying Changes
+
+### Quick deploy (file copy + restart)
+
+```bash
+# Copy file to server
+scp -i ~/.ssh/id_ed25519 <local-path> ubuntu@<server-ip>:/opt/landtts/<path>
+
+# Rebuild and restart specific service(s)
+ssh ubuntu@<server-ip> "cd /opt/landtts/infra/aws-single && docker compose -f docker-compose.prod.yml build api web && docker compose -f docker-compose.prod.yml up -d api web"
+```
+
+### Full rebuild (no-cache)
+
+```bash
+ssh ubuntu@<server-ip> "cd /opt/landtts/infra/aws-single && docker compose -f docker-compose.prod.yml build --no-cache api web && docker compose -f docker-compose.prod.yml up -d"
+```
+
+### Database operations
+
+```bash
+# Run Prisma push
+docker exec landtts-api npx prisma db push --schema=packages/db/prisma/schema.prisma
+
+# Direct SQL
+docker exec landtts-pg psql -U landtts_app -d landtts
 ```
 
 ## Monorepo Structure
