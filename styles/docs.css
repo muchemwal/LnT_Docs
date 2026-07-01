@@ -1,0 +1,51 @@
+/* Mobile screenshot sizing — cap width for phone screens */
+img[alt*="Mobile"],
+img[alt*="mobile"] {
+  max-width: 320px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  margin: 1rem 0;
+}
+
+:is(html[class~="dark"]) img[alt*="Mobile"],
+:is(html[class~="dark"]) img[alt*="mobile"] {
+  border-color: #374151;
+}
+
+/* Side-by-side mobile screenshots */
+.mobile-screens {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 1rem 0;
+}
+
+.mobile-screens img {
+  max-width: 280px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+}
+
+:is(html[class~="dark"]) .mobile-screens img {
+  border-color: #374151;
+}
+
+/* Web screenshots — full width with subtle border */
+img[alt*="Dashboard"],
+img[alt*="Dispatch"],
+img[alt*="Rota"],
+img[alt*="Timesheet"],
+img[alt*="Service Manager"] {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  margin: 1rem 0;
+}
+
+:is(html[class~="dark"]) img[alt*="Dashboard"],
+:is(html[class~="dark"]) img[alt*="Dispatch"],
+:is(html[class~="dark"]) img[alt*="Rota"],
+:is(html[class~="dark"]) img[alt*="Timesheet"],
+:is(html[class~="dark"]) img[alt*="Service Manager"] {
+  border-color: #374151;
+}
