@@ -15,8 +15,11 @@ It supports **offline-first operation** via WatermelonDB, **biometric authentica
 
 {/* TODO: Replace placeholders with actual screenshots */}
 ![Keycloak Mobile Login](/images/mobile-keycloak-login-placeholder.png)
-![Biometric Auth](/images/mobile-biometric-auth-placeholder.png)
-![Onboarding Flow](/images/mobile-onboarding-placeholder.png)
+
+![Biometric Mobile Auth](/images/mobile-biometric-auth-placeholder.png)
+
+![Onboarding Mobile Flow](/images/mobile-onboarding-placeholder.png)
+
 ![Location Disclosure](/images/mobile-location-disclosure-placeholder.png)
 
 ## Role-Based Navigation
@@ -38,38 +41,38 @@ It supports **offline-first operation** via WatermelonDB, **biometric authentica
 Crew logs in via Keycloak (or biometric unlock) and checks in with GPS location capture.
 Check-in creates a `TimeEntry` record and triggers Factorial/Deel clock-in sync.
 
-![Mobile Login](/images/30-mobile-login.png)
-![Shift Check-In](/images/33-mobile-shift-checkin.png)
+![Mobile Login](/images/mobile-keycloak-login-placeholder.png)
+![Shift Mobile Check-In](/images/33-mobile-shift-checkin.png)
 
 ### Job Acceptance
 
 Crew views assigned jobs and taps "Accept" to move the job to `accepted` status.
 
-![Job List](/images/31-mobile-job-list.png)
+![Job Mobile List](/images/31-mobile-job-list.png)
 
 ### Navigate to Pickup
 
 "Navigate" button launches native maps (Google Maps / Apple Maps) with pickup coordinates.
 
-![Navigate Pickup](/images/34-mobile-navigate-pickup.png)
+![Navigate Mobile Pickup](/images/34-mobile-navigate-pickup.png)
 
 ### Arrived at Pickup
 
 Captures GPS coordinates and timestamp. Transitions PTF to `arrived_pickup`.
 
-![Arrived Pickup](/images/35-mobile-arrived-pickup.png)
+![Arrived Mobile Pickup](/images/35-mobile-arrived-pickup.png)
 
 ### Risk Review
 
 Crew reviews the risk assessment checklist and confirms understanding before patient loading.
 
-![Risk Review](/images/36-mobile-risk-review.png)
+![Risk Mobile Review](/images/36-mobile-risk-review.png)
 
 ### Patient Loaded — Start Transit
 
 Transitions to `departed_pickup`. GPS tracking activates at 10-second intervals.
 
-![Patient Loaded](/images/38-mobile-patient-loaded.png)
+![Patient Mobile Loaded](/images/38-mobile-patient-loaded.png)
 
 ### In-Transit Journey Logging
 
@@ -85,13 +88,13 @@ Crew records journey log entries during transport:
 
 All notes are encrypted (AES-256) and tagged with GPS coordinates.
 
-![Journey Log](/images/37-mobile-journey-log.png)
+![Journey Mobile Log](/images/37-mobile-journey-log.png)
 
 ### Arrived at Destination
 
 Transitions to `arrived_destination`. Triggers clinical handover workflow.
 
-![Arrived Destination](/images/40-mobile-arrived-destination.png)
+![Arrived Mobile Destination](/images/40-mobile-arrived-destination.png)
 
 </Steps>
 
@@ -182,7 +185,7 @@ The crew dashboard (home screen) shows:
 - Notifications badge count
 
 {/* TODO: Screenshot placeholder */}
-![Crew Dashboard](/images/mobile-crew-dashboard-placeholder.png)
+![Crew Mobile Dashboard](/images/mobile-crew-dashboard-placeholder.png)
 
 ## Incident Reporting (Mobile)
 
@@ -239,7 +242,7 @@ Tap the PTT button on Dashboard:
 - Voice messages delivered instantly to dispatch
 
 {/* TODO: Screenshot placeholder */}
-![Push-to-Talk](/images/mobile-push-to-talk-placeholder.png)
+![Mobile Push-to-Talk](/images/mobile-push-to-talk-placeholder.png)
 
 ## Medication Recording (Mobile)
 
